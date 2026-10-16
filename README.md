@@ -27,4 +27,4 @@ The scripts prepare runtime dependencies and generate a signed UWP package. This
 
 This work is based on or integrates prior Minecraft launcher/compatibility work, including the [JavaUWP / Bandit Launcher project](https://github.com/veroxsity/JavaUWP). Some internal class names, mod IDs, bundled assets, service URLs, and code identifiers still reflect upstream components; those identifiers are not equivalent to the public-facing LegacyForge name. Third-party code and binaries retain their respective licenses and attribution requirements.
 
-Minecraft and Mojang game assets are not included. See [third-party components](docs/THIRD-PARTY.md) and [architecture](docs/ARCHITECTURE.md).
+LegacyForge does not configure BanditVault telemetry by default. To enable a separately operated endpoint, see [privacy and data flows](docs/PRIVACY.md).\n\nMinecraft and Mojang game assets are not included. See [third-party components](docs/THIRD-PARTY.md) and [architecture](docs/ARCHITECTURE.md).

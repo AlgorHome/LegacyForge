@@ -95,11 +95,11 @@ void ClearCrashStreak() {
     DeleteFileW((dir + L"\\crash_streak.txt").c_str());
 }
 
-constexpr wchar_t kDefaultEndpoint[] = L"https://telemetry.banditvault.co.uk";
+// No upstream-owned telemetry service is contacted by default. An operator may\n// explicitly configure an independent endpoint via the environment or endpoint.txt.
 
 std::wstring Endpoint() {
     static const std::wstring endpoint = [] {
-        const std::wstring fromEnv = GetEnvVarString(L"BANDIT_TELEMETRY_ENDPOINT");
+        const std::wstring fromEnv = GetEnvVarString(L"LEGACYFORGE_TELEMETRY_ENDPOINT");
         if (!fromEnv.empty()) return TrimWhitespace(fromEnv);
 
         const std::wstring dir = TelemetryDir();
@@ -111,7 +111,7 @@ std::wstring Endpoint() {
             }
         }
 
-        return std::wstring(kDefaultEndpoint);
+        return std::wstring();
     }();
     return endpoint;
 }

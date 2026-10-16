@@ -2556,14 +2556,14 @@ void ShowModsPage(
                         const int removed = DeleteControlifyModsFromDir(ProfileModsDir(runtimeRoot, state.modsProfileId));
                         state.modsProfileMods = ListProfileMods(runtimeRoot, state.modsProfileId);
                         state.status = removed > 0
-                            ? L"Bandit controller mod enabled and Controlify removed"
-                            : L"Bandit controller mod will be forced on launch";
+                            ? L"Built-in controller mod enabled and Controlify removed"
+                            : L"Built-in controller mod will be forced on launch";
                     } else {
                         const int removed = DeleteBanditControllerModsFromDir(ProfileModsDir(runtimeRoot, state.modsProfileId));
                         state.modsProfileMods = ListProfileMods(runtimeRoot, state.modsProfileId);
                         state.status = removed > 0
-                            ? L"Bandit controller mod disabled and removed"
-                            : L"Bandit controller mod disabled";
+                            ? L"Built-in controller mod disabled and removed"
+                            : L"Built-in controller mod disabled";
                     }
                     state.isError = false;
                 } else if (state.modsProfileFocus == 0) {
