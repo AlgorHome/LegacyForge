@@ -12,9 +12,9 @@ The existing authentication implementation may still use a third-party public Mi
 
 The inherited telemetry client remains in the source code, but **there is no default telemetry destination** in LegacyForge. Automatic event uploads and the remote compatibility-feed refresh are disabled unless an operator deliberately configures an endpoint.
 
-To configure an independently controlled telemetry endpoint, set `LEGACYFORGE_TELEMETRY_ENDPOINT` in the application environment or supply a URL in `LocalState\\telemetry\\endpoint.txt`. An endpoint may receive session/crash information only when the user grants telemetry consent; check the telemetry implementation and any server privacy policy before enabling. The compatibility feed requests `/v1/compat` from the configured endpoint even when telemetry consent is off, so configuring an endpoint enables that outbound request.
+To configure an independently controlled telemetry endpoint, set `LEGACYFORGE_TELEMETRY_ENDPOINT` in the application environment or supply a URL in `LocalState\telemetry\\endpoint.txt`. An endpoint may receive session/crash information only when the user grants telemetry consent; check the telemetry implementation and any server privacy policy before enabling. The compatibility feed requests `/v1/compat` from the configured endpoint even when telemetry consent is off, so configuring an endpoint enables that outbound request.
 
-Locally stored telemetry state can include consent, an installation identifier, queued crash events, and compatibility-feed cache in `LocalState\\telemetry`. See `MC.Xbox/telemetry/` for exact behavior.
+Locally stored telemetry state can include consent, an installation identifier, queued crash events, and compatibility-feed cache in `LocalState\telemetry`. See `MC.Xbox/telemetry/` for exact behavior.
 
 LegacyForge does **not** use `telemetry.banditvault.co.uk` by default. We have not replaced it with an AlgorHome server.
 
