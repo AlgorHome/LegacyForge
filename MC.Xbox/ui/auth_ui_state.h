@@ -26,6 +26,10 @@ struct AuthUiState {
     bool showRemoteFiles = false;
     bool showModsPage = false;
     int selectedMenuIndex = 0;
+    std::wstring homePlayerName;
+    std::wstring homeProfileName;
+    std::wstring homeTargetText;
+    int homeModCount = -1;
     int selectedModsTab = 0;
     ModSource modsSource = ModSource::Modrinth;
     int modsHoverSource = -1;

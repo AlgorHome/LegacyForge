@@ -562,14 +562,18 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
     state.title = L"LegacyForge Launcher";
     state.showDeviceCode = false;
     state.showMainMenu = true;
-    state.status = L"Signed in as " + a2w(authConfig.username.c_str());
+    state.homePlayerName = a2w(authConfig.username.c_str());
+    state.status = L"Signed in as " + state.homePlayerName;
     EnsureProfilesInitialized(runtimeRoot);
-    {
+    auto refreshHomeSummary = [&]() {
         const std::wstring activeId = GetActiveProfileId(runtimeRoot);
         const Profile activeProfile = GetProfileById(runtimeRoot, activeId);
         const LaunchTarget activeTarget = ResolveProfileTarget(runtimeRoot, activeProfile);
-        state.detail = L"Active profile: " + activeProfile.name + L" - " + TargetProfileText(activeTarget);
-    }
+        state.homeProfileName = activeProfile.name;
+        state.homeTargetText = TargetProfileText(activeTarget);
+        state.homeModCount = ProfileModCount(runtimeRoot, activeId);
+    };
+    refreshHomeSummary();
 
     int selected = 0;
     bool upWasDown = false;
@@ -633,7 +637,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
             if (selected == 1) {
                 WriteLog(L"Main menu: Mods selected");
                 ShowModsPage(window, renderer, state, runtimeRoot);
-                state.detail = L"Browse installed, popular, and latest Fabric mods.";
+                refreshHomeSummary();
             } else if (selected == 2) {
                 WriteLog(L"Main menu: Remote files selected");
                 ShowRemoteFilesPage(window, renderer, state, runtimeRoot);

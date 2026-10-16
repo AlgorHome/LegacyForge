@@ -1,6 +1,6 @@
 # LegacyForge UI V2 — Home Dashboard and Accounts
 
-Status: **design specification**. No dashboard or alternate account-provider implementation is implied by this document.
+Status: **Home V2 first implementation committed on a feature branch; PC preview and Xbox test pending.** Account manager and alternate account-provider implementation remain future work.
 
 ## Design principles
 
@@ -56,7 +56,7 @@ App starts
   ├─ valid cached Microsoft session → Home
   └─ no authenticated session → Microsoft Auth V2
                                    └─ More sign-in options → Accounts / Add Account
-Home → Accounts → Add Account
+Home → Accounts → Add Account (future)
   ├─ Microsoft → existing device-code authorization
   ├─ Local Profile → local identity editor (non-entitled; no authenticated game launch)
   ├─ Custom Skin Service → Coming later / explanation
@@ -68,8 +68,8 @@ No alternate account method should skip Microsoft ownership checks for authentic
 
 ## Implementation steps
 
-1. **Dashboard renderer:** adjust `MC.Xbox/ui/auth_screen.h` main-menu layout, add an explicit home UI state in `MC.Xbox/ui/auth_ui_state.h`, and update desktop previews in `tools/ui-preview/ui_preview.cpp`. Wire existing actions without behavioral changes.
-2. **Controller and hit-test mapping:** update `MC.Xbox/ui/launcher_ui.cpp` navigation and focus logic; test all existing actions and back behavior.
+1. **Dashboard renderer (implemented, pending verification):** adjust `MC.Xbox/ui/auth_screen.h` main-menu layout, add an explicit home UI state in `MC.Xbox/ui/auth_ui_state.h`, and update desktop previews in `tools/ui-preview/ui_preview.cpp`. Wire existing actions without behavioral changes.
+2. **Controller and hit-test mapping (preserved existing six actions, pending verification):** update `MC.Xbox/ui/launcher_ui.cpp` navigation and focus logic; test all existing actions and back behavior.
 3. **Accounts overlay:** add UI state, account-method choice focus handling, Microsoft re-entry and help text, without introducing unsupported providers.
 4. **Local Profile UI/data model:** implement local-only display identity separately; never confuse it with Microsoft authorization or game ownership.
 5. **Future optional Ely.by adapter:** design and evaluate separate secure provider support before enabling a login action.
@@ -90,3 +90,7 @@ No alternate account method should skip Microsoft ownership checks for authentic
 ## Scope boundary
 
 This document captures design and engineering requirements. It is **not** evidence that the features beyond Auth V2 are already implemented or hardware-tested. Preserve the validated Auth V2 build as a rollback checkpoint.
+
+## Home V2 implementation note
+
+The first implementation retains exactly six functional actions. Index 0 is the large Play button and indices 1–5 are sidebar buttons: Profiles & Mods (existing Mods page, which includes Profiles), Remote Files, Settings, Repair downloads, and Sign out. No dedicated Accounts action is shown until account-management code exists. Player, active profile, Minecraft target and mod count are populated from runtime state. The desktop preview includes `main-menu`, `home-mods-focus` and `home-no-profile` scenes. Build/hardware checks remain required.
