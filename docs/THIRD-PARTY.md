@@ -1,11 +1,6 @@
 # Third Party Components
 
 Components in this repository that originate elsewhere, and the terms they carry.
-The repository's own `LICENSE` covers original project code only. It does not
-override anything listed here.
-
-See `docs/LEGAL.md` for redistribution rules and `docs/PATCHING.md` for what each
-patch does and how it is applied.
 
 ## Vendored sources under `patch/`
 
@@ -45,10 +40,3 @@ terms.
 Not vendored, not committed, and not redistributed from this repository. They are
 downloaded on the build machine or on the device and are listed here so the full
 dependency surface is written down in one place.
-
-- Minecraft, Mojang assets, asset indexes and client jars. No redistribution
-  rights are granted by this repository, and the launcher verifies ownership
-  before downloading any of it.
-- Fabric Loader, Forge, NeoForge and their libraries.
-- LWJGL and its native jars.
-- The Java runtime, packaged from a locally installed JDK.
