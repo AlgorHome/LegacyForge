@@ -6,7 +6,7 @@ This page describes how the Bandit Launcher UWP host is organized after the `App
 
 Bandit Launcher is a single UWP process that:
 
-1. Authenticates the user with Microsoft or guest.
+1. Authenticates the user with Microsoft or guest via legacy.
 2. Manages profiles, mods, and launcher UI state.
 3. Verifies and downloads official runtime files into `LocalState`.
 4. Embeds the JVM, applies loader specific launch rules, and starts Minecraft.
