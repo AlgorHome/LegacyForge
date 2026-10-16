@@ -190,9 +190,32 @@ std::vector<Scene> Scenes() {
     scenes.push_back({ L"main-menu", [] {
         AuthUiState state = Screen();
         state.showMainMenu = true;
-        state.title = L"Steve";
-        state.status = L"Ready to play 1.21.11 Fabric";
-        state.detail = L"Profile Survival, 12 mods";
+        state.title = L"LegacyForge Launcher";
+        state.homePlayerName = L"Steve";
+        state.homeProfileName = L"Survival";
+        state.homeTargetText = L"1.21.11 Fabric 0.19.5";
+        state.homeModCount = 12;
+        state.status = L"Signed in as Steve";
+        return state;
+    } });
+    scenes.push_back({ L"home-mods-focus", [] {
+        AuthUiState state = Screen();
+        state.showMainMenu = true;
+        state.homePlayerName = L"Steve";
+        state.homeProfileName = L"Survival";
+        state.homeTargetText = L"1.21.11 Fabric 0.19.5";
+        state.homeModCount = 12;
+        state.selectedMenuIndex = 1;
+        return state;
+    } });
+    scenes.push_back({ L"home-no-profile", [] {
+        AuthUiState state = Screen();
+        state.showMainMenu = true;
+        state.homePlayerName = L"Alex";
+        state.homeProfileName.clear();
+        state.homeTargetText.clear();
+        state.homeModCount = -1;
+        state.selectedMenuIndex = 0;
         return state;
     } });
     scenes.push_back({ L"remote-files", [] {

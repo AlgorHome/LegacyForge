@@ -1,0 +1,96 @@
+# LegacyForge UI V2 — Home Dashboard and Accounts
+
+Status: **Home V2 first implementation committed on a feature branch; PC preview and Xbox test pending.** Account manager and alternate account-provider implementation remain future work.
+
+## Design principles
+
+- Xbox Series X|S Developer Mode first: readable at 10-foot viewing distance, TV-safe margins, D-pad/controller-first focus, no hover-only actions.
+- Legacy Launcher-inspired account chooser with original LegacyForge layout and green accent.
+- Preserve the proven Microsoft device-code authorization and Java Edition entitlement verification as the default.
+- Keep game profile selection separate from account identity; a local profile is not an authenticated Minecraft account.
+- Never present unavailable account providers as working sign-in methods.
+
+## Home dashboard
+
+Layout: dark background, header with **LEGACYFORGE** and “Minecraft Java. Reforged for Xbox.”; left column active-profile card and navigation; right feature card with large **Play Minecraft** action and readiness status. Provide accessible focus borders and readable error messages.
+
+Display only real state: authenticated Minecraft player name when known, actual active profile, Minecraft version, loader, mod count when available. Unknown values should show “Not selected” rather than fabricated data.
+
+| Control | Behavior | Existing integration / implementation |
+| --- | --- | --- |
+| Play Minecraft (default focus) | Starts current target after ownership and runtime validation | Existing `MainMenuAction::Play` |
+| Profiles | Navigate to existing profile manager; selecting a profile updates home summary | Existing Mods/Profiles functionality; dedicated route is new |
+| Mods | Open mods browser and profile mod manager | Existing `MainMenuAction::Mods` |
+| Accounts | Open new account manager; Microsoft account is initially the only real provider | New route; existing sign-in/sign-out preserved |
+| Remote Files | Existing local-network transfer page | Existing `MainMenuAction::RemoteFiles` |
+| Settings | Existing configuration screen | Existing `MainMenuAction::Settings` |
+| Repair downloads | Existing repair operation | Existing `MainMenuAction::Repair` |
+| Sign out | Clear authenticated session using existing logout handler and return to Microsoft sign-in | Existing `MainMenuAction::SignOut` |
+
+### Xbox navigation
+
+- D-pad up/down: move within navigation list; left/right: switch between navigation and primary Play/summary region.
+- A: activate the focused action. B: back from subpage or cancel modal (never sign out inadvertently).
+- The existing focus and hit-test implementation is the starting point; do not expose controller hints until corresponding input handlers exist.
+- Focus must remain visible at all times, with a clear recovery target when a modal closes.
+- Do not remap Play/Repair/Sign Out actions while merely changing the visual menu; migrate their identifiers and selection indices together.
+
+## Accounts panel — Legacy Launcher-inspired
+
+Entry: Home → Accounts → **Add Account**. An overlay uses two columns: saved accounts on left (when supported), account methods on right. Buttons should be large and controller-focusable. Back returns without changing authentication.
+
+| Account option | UI label | Behavior / scope |
+| --- | --- | --- |
+| Microsoft | **Microsoft Account · Recommended** | Existing Microsoft device-code login, Xbox Live/XSTS/Minecraft token exchange and Java entitlement check. Default active provider. |
+| Local | **Local Profile** | Create a display-name-only launcher profile for settings and UI testing. Must not create fake Microsoft/Xbox tokens or imply premium Java ownership. Disable authenticated Java game launching until a supported, legitimate launch mode is implemented and evaluated. |
+| Ely.by | **Custom Skin Service (Ely.by)** | Future optional provider. Requires separate provider API research, user consent, secure token storage and an explicit support matrix. A skin provider is not proof of Minecraft Java ownership. Mark **Coming later**; do not fake sign-in. |
+| Shop | **Get Minecraft Java Edition** | Informational action opening an official purchase/info page via an available URL mechanism. No in-app purchase claim. |
+| Help | **Account Help** | Explain Microsoft device-code sign-in, Java ownership and limitations of other profile types. |
+
+**Suggested account card fields:** display name; provider badge; verification state; last used (if tracked); active selection. Never display access/refresh tokens. Only show account removal after persistent multi-account storage exists; sign out is not the same as deleting an account.
+
+## Account flows
+
+```text
+App starts
+  ├─ valid cached Microsoft session → Home
+  └─ no authenticated session → Microsoft Auth V2
+                                   └─ More sign-in options → Accounts / Add Account
+Home → Accounts → Add Account (future)
+  ├─ Microsoft → existing device-code authorization
+  ├─ Local Profile → local identity editor (non-entitled; no authenticated game launch)
+  ├─ Custom Skin Service → Coming later / explanation
+  ├─ Get Minecraft → official help/purchase info
+  └─ Account Help → instructions
+```
+
+No alternate account method should skip Microsoft ownership checks for authenticated Minecraft launching. Keep account identifiers, session state, and game profiles in distinct data models.
+
+## Implementation steps
+
+1. **Dashboard renderer (implemented, pending verification):** adjust `MC.Xbox/ui/auth_screen.h` main-menu layout, add an explicit home UI state in `MC.Xbox/ui/auth_ui_state.h`, and update desktop previews in `tools/ui-preview/ui_preview.cpp`. Wire existing actions without behavioral changes.
+2. **Controller and hit-test mapping (preserved existing six actions, pending verification):** update `MC.Xbox/ui/launcher_ui.cpp` navigation and focus logic; test all existing actions and back behavior.
+3. **Accounts overlay:** add UI state, account-method choice focus handling, Microsoft re-entry and help text, without introducing unsupported providers.
+4. **Local Profile UI/data model:** implement local-only display identity separately; never confuse it with Microsoft authorization or game ownership.
+5. **Future optional Ely.by adapter:** design and evaluate separate secure provider support before enabling a login action.
+6. **Visual assets:** original icon, blur/background art with appropriate rights, no dependence on the archived launcher executable.
+
+## Acceptance tests
+
+- [ ] Desktop previews render home, Accounts, Add Account, focus and error states.
+- [ ] Home uses real profile/loader/version data and does not truncate on a TV.
+- [ ] A activates Play/Mods/Settings/Remote Files/Repair exactly as before; B navigates back without signing out.
+- [ ] Microsoft Auth V2 still completes device-code authentication and ownership validation.
+- [ ] Signing out clears the Microsoft session only through existing logout logic.
+- [ ] Local Profile is visibly labeled non-authenticated and cannot impersonate an entitled Java account.
+- [ ] Unsupported providers have disabled or informational actions, not misleading login buttons.
+- [ ] Xbox APPX builds, upgrades, launches, navigates with controller and reaches the existing home screen.
+- [ ] Existing Java Edition vanilla and Fabric test launches are rechecked independently.
+
+## Scope boundary
+
+This document captures design and engineering requirements. It is **not** evidence that the features beyond Auth V2 are already implemented or hardware-tested. Preserve the validated Auth V2 build as a rollback checkpoint.
+
+## Home V2 implementation note
+
+The first implementation retains exactly six functional actions. Index 0 is the large Play button and indices 1–5 are sidebar buttons: Profiles & Mods (existing Mods page, which includes Profiles), Remote Files, Settings, Repair downloads, and Sign out. No dedicated Accounts action is shown until account-management code exists. Player, active profile, Minecraft target and mod count are populated from runtime state. The desktop preview includes `main-menu`, `home-mods-focus` and `home-no-profile` scenes. Build/hardware checks remain required.

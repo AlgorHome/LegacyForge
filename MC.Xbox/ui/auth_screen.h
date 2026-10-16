@@ -925,46 +925,135 @@ public:
         }
 
         if (state.showMainMenu) {
-            const float left = frame.left + 36.0f;
-            const float menuRight = frame.left + (frame.right - frame.left) * 0.34f;
-            const float previewLeft = menuRight + 34.0f;
-            const float previewRight = frame.right - 36.0f;
-            const float top = frame.top + 34.0f;
-            const float buttonH = 56.0f;
-            const float buttonGap = 14.0f;
-            const wchar_t* labels[] = { L"Play", L"Mods", L"Remote Files", L"Settings", L"Repair downloads", L"Sign out" };
+            // Home V2: keep the six existing actions and their indices.
+            // Index 0 is the large Play button, 1..5 are sidebar entries.
+            const float left = frame.left + 38.0f;
+            const float right = frame.right - 38.0f;
+            const float headerTop = frame.top + 22.0f;
+            const float dividerY = frame.top + 122.0f;
+            const float bodyTop = dividerY + 20.0f;
+            const float bodyBottom = frame.bottom - 28.0f;
+            const float leftRight = left + (right - left) * 0.344f;
+            const float heroLeft = leftRight + 22.0f;
+            const D2D1_RECT_F hero = D2D1::RectF(heroLeft, bodyTop, right, bodyBottom);
 
-            DrawText(title.c_str(), titleFormat_.Get(), D2D1::RectF(left, top, menuRight, top + 48.0f), white.Get());
+            // Header: the signed-in account is displayed as information, not
+            // as an unimplemented account-switching action.
+            d2dContext_->FillRectangle(
+                D2D1::RectF(left, headerTop, left + 58.0f, headerTop + 5.0f), accent.Get());
+            DrawText(L"LEGACYFORGE", titleFormat_.Get(),
+                D2D1::RectF(left, headerTop + 11.0f, left + 500.0f, headerTop + 66.0f), white.Get());
+            DrawText(L"Minecraft Java. Reforged for Xbox.", captionFormat_.Get(),
+                D2D1::RectF(left + 2.0f, headerTop + 69.0f, left + 510.0f, headerTop + 95.0f), muted.Get());
 
-            const wchar_t* menuIcons[] = { L"\uE768", L"\uE74C", L"\uE838", L"\uE713", L"\uE72C", L"\uE7E8" };
-            for (int i = 0; i < kMainMenuItems; ++i) {
-                const float y = top + 76.0f + i * (buttonH + buttonGap);
-                const D2D1_RECT_F button = D2D1::RectF(left, y, menuRight, y + buttonH);
+            const D2D1_RECT_F account = D2D1::RectF(right - 306.0f, headerTop + 8.0f,
+                right, headerTop + 91.0f);
+            FillRound(account, surfaceFill.Get(), 13.0f);
+            StrokeRound(account, softEdge.Get(), 13.0f, 1.0f);
+            DrawText(L"MICROSOFT ACCOUNT", captionFormat_.Get(),
+                D2D1::RectF(account.left + 16.0f, account.top + 12.0f,
+                    account.right - 12.0f, account.top + 37.0f), muted.Get());
+            const std::wstring player = state.homePlayerName.empty()
+                ? std::wstring(L"Signed in") : state.homePlayerName;
+            DrawText(player.c_str(), bodyMid_.Get(),
+                D2D1::RectF(account.left + 16.0f, account.top + 39.0f,
+                    account.right - 12.0f, account.bottom - 8.0f), white.Get());
+            d2dContext_->FillRectangle(
+                D2D1::RectF(left, dividerY, right, dividerY + 1.0f), softEdge.Get());
+
+            // Active game profile — all text and the mod count are populated
+            // from profile storage by ShowMainMenu, not demo data.
+            const D2D1_RECT_F profile = D2D1::RectF(left, bodyTop, leftRight, bodyTop + 108.0f);
+            FillRound(profile, accentSoft.Get(), 14.0f);
+            StrokeRound(profile, accent.Get(), 14.0f, 1.0f);
+            DrawText(L"ACTIVE PROFILE", captionFormat_.Get(),
+                D2D1::RectF(profile.left + 16.0f, profile.top + 11.0f,
+                    profile.right - 16.0f, profile.top + 36.0f), accent.Get());
+            const std::wstring profileName = state.homeProfileName.empty()
+                ? std::wstring(L"Not selected") : state.homeProfileName;
+            DrawText(profileName.c_str(), bodyMid_.Get(),
+                D2D1::RectF(profile.left + 16.0f, profile.top + 38.0f,
+                    profile.right - 16.0f, profile.top + 74.0f), white.Get());
+            const std::wstring target = state.homeTargetText.empty()
+                ? std::wstring(L"Minecraft target not selected") : state.homeTargetText;
+            DrawText(target.c_str(), captionFormat_.Get(),
+                D2D1::RectF(profile.left + 16.0f, profile.top + 76.0f,
+                    profile.right - 16.0f, profile.bottom - 6.0f), muted.Get());
+
+            const wchar_t* labels[] = {
+                L"Profiles & Mods", L"Remote Files", L"Settings",
+                L"Repair downloads", L"Sign out"
+            };
+            const wchar_t* icons[] = {
+                L"\uE74C", L"\uE838", L"\uE713", L"\uE72C", L"\uE7E8"
+            };
+            const float navTop = profile.bottom + 12.0f;
+            const float navHeight = 55.0f;
+            const float navGap = 7.0f;
+            for (int i = 1; i < kMainMenuItems; ++i) {
+                const float y = navTop + static_cast<float>(i - 1) * (navHeight + navGap);
+                const D2D1_RECT_F button = D2D1::RectF(left, y, leftRight, y + navHeight);
                 mainMenuRects_[i] = button;
-                const bool sel = i == state.selectedMenuIndex;
-                if (sel) GlowSelect(button, 14.0f);
-                FillRound(button, sel ? accentSoft.Get() : surfaceFill.Get(), 14.0f);
-                StrokeRound(button, sel ? accent.Get() : softEdge.Get(), 14.0f, sel ? 3.0f : 1.0f);
-                DrawIcon(menuIcons[i], D2D1::RectF(button.left + 16.0f, button.top, button.left + 50.0f, button.bottom), sel ? accent.Get() : white.Get());
-                const D2D1_RECT_F textRect = D2D1::RectF(button.left + 56.0f, button.top, button.right - 12.0f, button.bottom);
-                DrawText(labels[i], bodyMid_.Get(), textRect, sel ? accent.Get() : white.Get());
+                const bool selected = state.selectedMenuIndex == i;
+                if (selected) GlowSelect(button, 12.0f);
+                FillRound(button, selected ? accentSoft.Get() : surfaceFill.Get(), 12.0f);
+                StrokeRound(button, selected ? accent.Get() : softEdge.Get(),
+                    12.0f, selected ? 2.5f : 1.0f);
+                DrawIcon(icons[i - 1],
+                    D2D1::RectF(button.left + 13.0f, button.top,
+                        button.left + 47.0f, button.bottom),
+                    selected ? accent.Get() : white.Get());
+                DrawText(labels[i - 1], smallMid_.Get(),
+                    D2D1::RectF(button.left + 53.0f, button.top,
+                        button.right - 9.0f, button.bottom),
+                    selected ? accent.Get() : white.Get());
             }
+
+            // The right-hand hero card uses the existing packaged screenshots.
+            // The Play button is the *real* action 0 with a mouse hit rectangle.
+            FillRound(hero, surfaceFill.Get(), 16.0f);
+            StrokeRound(hero, softEdge.Get(), 16.0f, 1.0f);
+            const D2D1_RECT_F screenshot = D2D1::RectF(
+                hero.left + 12.0f, hero.top + 12.0f,
+                hero.right - 12.0f, hero.top + 189.0f);
+            DrawScreenshots(screenshot, 11.0f);
+            StrokeRound(screenshot, softEdge.Get(), 11.0f, 1.0f);
+
+            DrawText(L"MINECRAFT JAVA EDITION", cardTitleFormat_.Get(),
+                D2D1::RectF(hero.left + 25.0f, hero.top + 206.0f,
+                    hero.right - 24.0f, hero.top + 242.0f), white.Get());
+            DrawText(L"Your world. Your mods. Your Xbox.", smallFormat_.Get(),
+                D2D1::RectF(hero.left + 25.0f, hero.top + 246.0f,
+                    hero.right - 24.0f, hero.top + 281.0f), muted.Get());
+
+            const std::wstring profileLine = L"Profile: " + profileName;
+            std::wstring modsLine = L"Mods: Not available";
+            if (state.homeModCount >= 0) {
+                modsLine = L"Mods: " + std::to_wstring(state.homeModCount);
+            }
+            DrawText(profileLine.c_str(), captionFormat_.Get(),
+                D2D1::RectF(hero.left + 25.0f, hero.top + 289.0f,
+                    hero.right - 24.0f, hero.top + 316.0f), accent.Get());
+            DrawText(modsLine.c_str(), captionFormat_.Get(),
+                D2D1::RectF(hero.left + 25.0f, hero.top + 317.0f,
+                    hero.right - 24.0f, hero.top + 344.0f), muted.Get());
+
+            const D2D1_RECT_F play = D2D1::RectF(
+                hero.left + 25.0f, hero.bottom - 91.0f,
+                hero.right - 25.0f, hero.bottom - 30.0f);
+            mainMenuRects_[0] = play;
+            const bool playSelected = state.selectedMenuIndex == 0;
+            if (playSelected) GlowSelect(play, 14.0f);
+            FillRound(play, playSelected ? accent.Get() : accentSoft.Get(), 14.0f);
+            StrokeRound(play, accent.Get(), 14.0f, playSelected ? 2.5f : 1.0f);
+            DrawIcon(L"\uE768",
+                D2D1::RectF(play.left + 16.0f, play.top, play.left + 54.0f, play.bottom),
+                playSelected ? black.Get() : accent.Get());
+            DrawText(L"PLAY MINECRAFT", bodyMid_.Get(),
+                D2D1::RectF(play.left + 59.0f, play.top,
+                    play.right - 12.0f, play.bottom),
+                playSelected ? black.Get() : white.Get());
             mainMenuRectCount_ = kMainMenuItems;
-
-            if (!state.status.empty()) {
-                const D2D1_RECT_F statusRect = D2D1::RectF(left, frame.bottom - 88.0f, menuRight, frame.bottom - 28.0f);
-                DrawText(state.status.c_str(), smallFormat_.Get(), statusRect, state.isError ? danger.Get() : muted.Get());
-            }
-
-            const D2D1_RECT_F preview = D2D1::RectF(previewLeft, top, previewRight, frame.bottom - 34.0f);
-            FillRound(preview, black.Get(), 16.0f);
-            DrawScreenshots(preview, 16.0f);
-            StrokeRound(preview, softEdge.Get(), 16.0f, 1.0f);
-
-            if (!state.detail.empty()) {
-                const D2D1_RECT_F detailRect = D2D1::RectF(preview.left + 26.0f, preview.bottom - 82.0f, preview.right - 26.0f, preview.bottom - 24.0f);
-                DrawText(state.detail.c_str(), smallFormat_.Get(), detailRect, muted.Get());
-            }
 
             finishDraw();
             return;
