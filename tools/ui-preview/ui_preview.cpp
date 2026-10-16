@@ -217,6 +217,14 @@ std::vector<Scene> Scenes() {
         state.accountsMessage = L"A  Select an option  |  B  Back";
         return state;
     } });
+    scenes.push_back({ L"accounts-prelogin", [] {
+        AuthUiState state = Screen();
+        state.showDeviceCode = true;
+        state.showAccounts = true;
+        state.homePlayerName.clear();
+        state.accountsMessage = L"A  Select option  |  B  Back to sign-in";
+        return state;
+    } });
     scenes.push_back({ L"accounts-local", [] {
         AuthUiState state = Screen();
         state.showAccounts = true;

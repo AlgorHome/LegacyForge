@@ -796,6 +796,69 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
     state.secondsRemaining = device.expiresIn;
     RenderAuth(renderer, state);
 
+    // Allow controller-only browsing of account options during device-code polling.
+    bool xWasDown = false;
+    bool bWasDown = false;
+    bool upWasDown = false;
+    bool downWasDown = false;
+    bool selectWasDown = false;
+    auto waitWithAccountOptions = [&](int milliseconds) {
+        const auto start = std::chrono::steady_clock::now();
+        while (std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now() - start).count() < milliseconds) {
+            const bool x = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_X,
+                ABI::Windows::System::VirtualKey_GamepadX
+            });
+            const bool back = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Escape,
+                ABI::Windows::System::VirtualKey_GamepadB
+            });
+            if (x && !xWasDown && !state.showAccounts) {
+                state.showAccounts = true;
+                state.selectedAccountIndex = 0;
+                state.accountsMessage = L"A  Select option  |  B  Back to sign-in";
+            }
+            if (state.showAccounts) {
+                const bool up = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Up,
+                    ABI::Windows::System::VirtualKey_GamepadDPadUp
+                });
+                const bool down = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Down,
+                    ABI::Windows::System::VirtualKey_GamepadDPadDown
+                });
+                const bool select = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Enter,
+                    ABI::Windows::System::VirtualKey_GamepadA
+                });
+                if (up && !upWasDown) state.selectedAccountIndex = (state.selectedAccountIndex + 4) % 5;
+                if (down && !downWasDown) state.selectedAccountIndex = (state.selectedAccountIndex + 1) % 5;
+                if (select && !selectWasDown) {
+                    switch (state.selectedAccountIndex) {
+                    case 0: state.accountsMessage = L"Press B to return to Microsoft sign-in."; break;
+                    case 1: state.accountsMessage = L"Local Profiles are coming later."; break;
+                    case 2: state.accountsMessage = L"Ely.by integration is coming later."; break;
+                    case 3: state.accountsMessage = L"Minecraft Java information: minecraft.net"; break;
+                    default: state.accountsMessage = L"Microsoft verifies Java Edition ownership."; break;
+                    }
+                }
+                upWasDown = up;
+                downWasDown = down;
+                selectWasDown = select;
+                if (back && !bWasDown) state.showAccounts = false;
+            } else {
+                upWasDown = false;
+                downWasDown = false;
+                selectWasDown = false;
+            }
+            xWasDown = x;
+            bWasDown = back;
+            RenderAuth(renderer, state);
+            std::this_thread::sleep_for(std::chrono::milliseconds(70));
+        }
+    };
+
     auto expiresAt = std::chrono::steady_clock::now() + std::chrono::seconds(device.expiresIn);
     int interval = device.interval;
     while (std::chrono::steady_clock::now() < expiresAt) {
@@ -803,7 +866,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
             std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::steady_clock::now()).count());
         state.status = L"Waiting for Microsoft sign-in";
         state.detail = L"Use the account that owns Minecraft Java Edition.";
-        SleepWithAuthUi(renderer, state, interval * 1000);
+        waitWithAccountOptions(interval * 1000);
 
         state.status = L"Checking sign-in";
         state.detail.clear();
@@ -851,6 +914,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
         return false;
     }
 
+    state.showAccounts = false;
     state.status = L"Microsoft sign-in expired";
     state.detail = L"Restart the app to request a new code.";
     state.isError = true;

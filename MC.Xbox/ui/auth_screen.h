@@ -934,7 +934,7 @@ public:
 
             DrawText(L"ACCOUNTS", titleFormat_.Get(),
                 D2D1::RectF(left, top, right, top + 55.0f), white.Get());
-            DrawText(L"Manage your launcher identity  |  B  Back to Home",
+            DrawText(state.showDeviceCode ? L"B  Back to sign-in" : L"Manage your launcher identity  |  B  Back to Home",
                 captionFormat_.Get(),
                 D2D1::RectF(left, top + 56.0f, right, top + 88.0f), muted.Get());
 
@@ -952,15 +952,15 @@ public:
                 saved.left + 18.0f, saved.top + 78.0f, saved.right - 18.0f, saved.top + 184.0f);
             FillRound(linked, accentSoft.Get(), 12.0f);
             StrokeRound(linked, accent.Get(), 12.0f, 1.0f);
-            DrawText(L"MICROSOFT  /  CONNECTED", captionFormat_.Get(),
+            DrawText(state.showDeviceCode ? L"MICROSOFT  /  SIGN-IN AVAILABLE" : L"MICROSOFT  /  CONNECTED", captionFormat_.Get(),
                 D2D1::RectF(linked.left + 15.0f, linked.top + 9.0f,
                     linked.right - 12.0f, linked.top + 36.0f), accent.Get());
             const std::wstring accountName = state.homePlayerName.empty()
-                ? std::wstring(L"Signed in") : state.homePlayerName;
+                ? std::wstring(state.showDeviceCode ? L"Not signed in" : L"Signed in") : state.homePlayerName;
             DrawText(accountName.c_str(), bodyMid_.Get(),
                 D2D1::RectF(linked.left + 15.0f, linked.top + 43.0f,
                     linked.right - 12.0f, linked.bottom - 11.0f), white.Get());
-            DrawText(L"Your Microsoft account remains the default.\n"
+            DrawText(L"Microsoft is the recommended sign-in method.\n"
                 L"Other providers do not verify Minecraft ownership.",
                 smallFormat_.Get(),
                 D2D1::RectF(saved.left + 18.0f, saved.top + 208.0f,
@@ -974,7 +974,7 @@ public:
                 L"Custom Skin Service (Ely.by)", L"Get Minecraft", L"Account Help"
             };
             const wchar_t* hints[] = {
-                L"Default  /  connected", L"Local identity  /  coming later",
+                L"Default  /  device-code sign-in", L"Local identity  /  coming later",
                 L"Optional service  /  coming later", L"Official information",
                 L"Sign-in and ownership guidance"
             };
@@ -1347,7 +1347,7 @@ public:
             D2D1::RectF(guide.left + 25.0f, guide.bottom - 78.0f,
                 guide.right - 20.0f, guide.bottom - 51.0f),
             state.isError ? danger.Get() : muted.Get());
-        DrawText(L"No QR code needed. This screen updates automatically.",
+        DrawText(L"X  Other Account Options  /  No QR required",
             captionFormat_.Get(),
             D2D1::RectF(guide.left + 25.0f, guide.bottom - 49.0f,
                 guide.right - 18.0f, guide.bottom - 10.0f), muted.Get());

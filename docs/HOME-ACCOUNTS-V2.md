@@ -98,3 +98,7 @@ The first implementation retains exactly six functional actions. Index 0 is the 
 ## Accounts UI V2 first implementation
 
 The Accounts navigation entry and account-options page are implemented on `feature/legacyforge-accounts-v2`, pending compilation and Xbox testing. Microsoft remains the existing authenticated account, while Local Profile and Ely.by display explicit *coming later* status. Get Minecraft and Help present information rather than opening external links. D-pad up/down moves option focus, A displays option information, B returns Home. No provider credentials are requested and no alternate Minecraft entitlement flow is present.
+
+## Pre-login Accounts navigation
+
+The Microsoft device-code page now offers **X Other Account Options**. Xbox X opens Accounts while the code is pending; D-pad navigates, A displays availability information and B returns to sign-in. Minecraft ownership is not required to browse the panel. Other methods remain informational. Microsoft device-code polling continues. PC build and Xbox testing pending.
