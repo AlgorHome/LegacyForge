@@ -95,7 +95,8 @@ void ClearCrashStreak() {
     DeleteFileW((dir + L"\\crash_streak.txt").c_str());
 }
 
-// No upstream-owned telemetry service is contacted by default. An operator may\n// explicitly configure an independent endpoint via the environment or endpoint.txt.
+// No upstream-owned telemetry service is contacted by default. An operator may
+// explicitly configure an independent endpoint via the environment or endpoint.txt.
 
 std::wstring Endpoint() {
     static const std::wstring endpoint = [] {
