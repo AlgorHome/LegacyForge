@@ -25,7 +25,7 @@ try {
         [System.IO.FileAccess]::ReadWrite,
         [System.IO.FileShare]::None)
 } catch [System.IO.IOException] {
-    throw "Another Bandit Launcher build is already using this checkout."
+    throw "Another LegacyForge Launcher build is already using this checkout."
 }
 
 try {
@@ -69,7 +69,7 @@ $glfwBuildDir = Join-Path $buildDir "glfw_shim"
 $mouseSupportBuildDir = Join-Path $buildDir "mouse_support"
 $mouseSupportDll = Join-Path $mouseSupportBuildDir "mouse_support.dll"
 $mouseSupportLib = Join-Path $mouseSupportBuildDir "mouse_support.lib"
-$mcExe = Join-Path $mcBuildDir "MC.Xbox.exe"
+$mcExe = Join-Path $mcBuildDir "LegacyForge.exe"
 $shimDll = Join-Path $glfwBuildDir "glfw.dll"
 $jreSrc = Resolve-JavaHome
 $jre21Src = Resolve-JavaHomeExact -MajorVersion 21
@@ -124,7 +124,7 @@ if ($AppxVersion) {
 }
 Ensure-Dir (Split-Path $verFile)
 Set-Content -Path $verFile -Value $appVersion -NoNewline
-$appx = Join-Path $outDir ("BanditLauncher_{0}.appx" -f $appVersion)
+$appx = Join-Path $outDir ("LegacyForge_{0}.appx" -f $appVersion)
 
 $mcVersionSource = if ($McVersion) {
     "-McVersion"
@@ -322,7 +322,7 @@ public static class BuildRestartManager
 
             if ($_.ProcessId -ne $PID) {
                 if ($lockProcessIds -contains $_.ProcessId) { $matched = $true }
-                if ($name -ieq "MC.Xbox.exe") { $matched = $true }
+                if ($name -ieq "LegacyForge.exe") { $matched = $true }
                 if ($PackageName -and ($path -like "*$PackageName*" -or $cmd -like "*$PackageName*")) { $matched = $true }
 
                 $isPackagingTool = $name -ieq "makeappx.exe" -or $name -ieq "signtool.exe"
@@ -389,7 +389,7 @@ if ($runtimeConfigContent -match '@@[A-Z_]+@@') { throw "runtime_config.h still 
 [System.IO.File]::WriteAllText($runtimeConfigOutput, $runtimeConfigContent)
 Write-Host "runtime_config.h written for MC $($ProjectConfig.MinecraftVersion) / fabric-loader $($ProjectConfig.FabricLoaderVersion) / asset index $($ProjectConfig.MinecraftAssetIndex)"
 
-Write-Host "=== Building MC.Xbox.exe ==="
+Write-Host "=== Building LegacyForge.exe ==="
 $mcSources = @(
     Get-ChildItem (Join-Path $root "MC.Xbox") -Recurse -File -Include *.cpp, *.c, *.h, *.hpp
     Get-ChildItem (Join-Path $root "mouse_support") -Recurse -File -Include *.cpp, *.h
@@ -413,9 +413,9 @@ if ($mcNeedsBuild) {
     if ($LASTEXITCODE -ne 0) { throw "Compile failed" }
     Pop-Location
     Set-BuildStamp -StampPath $mcStampPath -Stamp $mcStamp
-    Write-Host "MC.Xbox.exe built"
+    Write-Host "LegacyForge.exe built"
 } else {
-    Write-Host "MC.Xbox.exe up to date, skipping compile."
+    Write-Host "LegacyForge.exe up to date, skipping compile."
 }
 
 Write-Host "=== Building mouse support DLL ==="
@@ -450,7 +450,7 @@ Ensure-Dir (Join-Path $pkg "runtime\log_configs")
 Ensure-Dir (Join-Path $pkg "runtime\bundled-mods")
 Ensure-Dir (Join-Path $pkg "runtime\libraries")
 
-Copy-Item $mcExe (Join-Path $pkg "MC.Xbox.exe")
+Copy-Item $mcExe (Join-Path $pkg "LegacyForge.exe")
 
 $manifestOut = Join-Path $pkg "AppxManifest.xml"
 $manifestText = [System.IO.File]::ReadAllText($manifestSourcePath)
@@ -1252,10 +1252,9 @@ $allSigningCertCandidates = Get-ChildItem Cert:\CurrentUser\My |
         ($_.EnhancedKeyUsageList | Where-Object { $_.FriendlyName -eq 'Code Signing' })
     }
 $exactSigningCertCandidates = $allSigningCertCandidates | Where-Object { $_.Subject -eq $certName } | Sort-Object NotBefore -Descending
-$banditVaultSigningCertCandidates = $allSigningCertCandidates | Where-Object { $_.Subject -like '*BanditVault*' -and $_.Subject -ne $certName } | Sort-Object NotBefore -Descending
-$signingCertCandidates = @($exactSigningCertCandidates) + @($banditVaultSigningCertCandidates)
+$signingCertCandidates = @($exactSigningCertCandidates)
 if (-not $signingCertCandidates) {
-    throw "No signing certificate for '$certName' in Cert:\CurrentUser\My. Restore the BanditVault certificate, or set APPX_CERT_SUBJECT to the subject you want to sign with. Signing with an unrelated certificate changes the package family name and loses LocalState."
+    throw "No signing certificate for '$certName' in Cert:\CurrentUser\My. Generate a new development certificate matching the manifest publisher (CN=AlgorHome); APPX_CERT_SUBJECT must match that publisher."
 }
 
 $makeappx = Get-ChildItem "${sdkRoot}bin\$sdkVer\x64\makeappx.exe","${sdkRoot}bin\$sdkToolsFallbackVer\x64\makeappx.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName

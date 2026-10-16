@@ -1,10 +1,10 @@
 # Architecture
 
-This page describes how the Bandit Launcher UWP host is organized after the `App.cpp` split. It is meant for contributors who need to find launch, auth, UI, or loader code quickly.
+This page describes how the LegacyForge Launcher UWP host is organized after the `App.cpp` split. It is meant for contributors who need to find launch, auth, UI, or loader code quickly.
 
 ## Overview
 
-Bandit Launcher is a single UWP process that:
+LegacyForge Launcher is a single UWP process that:
 
 1. Authenticates the user with Microsoft or guest via legacy.
 2. Manages profiles, mods, and launcher UI state.

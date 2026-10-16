@@ -2088,7 +2088,7 @@ void ShowModsPage(
     compat::RefreshAsync();
     state.showMainMenu = false;
     state.showModsPage = true;
-    state.title = L"Bandit Launcher";
+    state.title = L"LegacyForge Launcher";
     state.selectedModsTab = 0;
     state.selectedModIndex = 0;
     state.modsFocus = 0;

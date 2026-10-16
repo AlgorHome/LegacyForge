@@ -560,7 +560,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
     }
 
     AuthUiState state;
-    state.title = L"Bandit Launcher";
+    state.title = L"LegacyForge Launcher";
     state.showDeviceCode = false;
     state.showMainMenu = true;
     state.status = L"Signed in as " + a2w(authConfig.username.c_str());

@@ -183,7 +183,7 @@ The top level build copies the DLL into package natives. The JVM launch forces L
 
 ## Runtime layout
 
-The packaged app keeps launcher owned runtime files under the package folder. At launch, `MC.Xbox.exe` prepares writable state in `LocalState`:
+The packaged app keeps launcher owned runtime files under the package folder. At launch, `LegacyForge.exe` prepares writable state in `LocalState`:
 
 ```text
 LocalState\game
@@ -204,7 +204,7 @@ securejarhandler-uwp-patch.jar
 
 The root `download_manifest.tsv` remains the default target manifest. The `runtime\manifests` folder contains per target manifests for cataloged Fabric, Forge, and NeoForge targets.
 
-`MC.Xbox.exe` writes a `LocalState\.download_manifest` marker containing the selected launch target and packaged manifest hash. If that marker changes, the launcher removes downloaded official runtime folders before validating the new manifest. The signed in menu's `Repair downloads` action forces this cleanup for the current target.
+`LegacyForge.exe` writes a `LocalState\.download_manifest` marker containing the selected launch target and packaged manifest hash. If that marker changes, the launcher removes downloaded official runtime folders before validating the new manifest. The signed in menu's `Repair downloads` action forces this cleanup for the current target.
 
 ## Version targets
 

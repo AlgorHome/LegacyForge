@@ -972,7 +972,7 @@ bool RunEmbeddedMinecraft(const std::wstring& exeDir,
         replaceAll(L"${classpath_separator}", L";");
         replaceAll(L"${version_name}", launchVersion);
         replaceAll(L"${natives_directory}", fwd(nativesDir));
-        replaceAll(L"${launcher_name}", L"BanditLauncher");
+        replaceAll(L"${launcher_name}", L"LegacyForge");
         replaceAll(L"${launcher_version}", L"1");
         return arg;
     };
@@ -1221,7 +1221,7 @@ bool RunEmbeddedMinecraft(const std::wstring& exeDir,
         // resolved here because the template has no way to know where LocalState landed
         const std::wstring gcLogPath = fwd(launcherLogDir) + L"/gc.log";
         const std::wstring tpl =
-            L"# Bandit Launcher JVM options\n"
+            L"# LegacyForge Launcher JVM options\n"
             L"# One option per line. Lines starting with # are ignored.\n"
             L"#\n"
             L"# These are appended after the launcher's own options, so anything set here\n"

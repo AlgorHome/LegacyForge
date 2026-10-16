@@ -23,7 +23,7 @@
 static std::wstring RuntimeSeedStamp(const std::wstring& packageDir) {
     return std::wstring(L"seedVersion=5\n") +
         L"packageDir=" + packageDir + L"\n" +
-        L"exe=" + FileStamp(packageDir + L"\\MC.Xbox.exe") + L"\n" +
+        L"exe=" + FileStamp(packageDir + L"\\LegacyForge.exe") + L"\n" +
         L"manifest=" + FileStamp(packageDir + L"\\AppxManifest.xml") + L"\n" +
         L"downloadManifest=" + FileStamp(packageDir + L"\\download_manifest.tsv") + L"\n" +
         L"versionCatalog=" + FileStamp(packageDir + L"\\runtime\\version_catalog.tsv") + L"\n" +
