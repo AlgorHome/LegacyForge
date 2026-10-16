@@ -74,7 +74,7 @@ LaunchTarget Target(const wchar_t* mc, const wchar_t* loader, const wchar_t* loa
 AuthUiState Screen() {
     AuthUiState state;
     state.showDeviceCode = false;
-    state.title = L"Bandit Launcher";
+    state.title = L"LegacyForge Launcher";
     return state;
 }
 
@@ -144,9 +144,30 @@ std::vector<Scene> Scenes() {
         state.verificationUri = L"microsoft.com/link";
         state.status = L"Waiting for you to sign in";
         state.secondsRemaining = 842;
-        state.qr = GenerateLoginQrMatrix("https://www.microsoft.com/link?otc=QXR7-2KWM");
         return state;
     } });
+    scenes.push_back({ L"signin-expired", [] {
+        AuthUiState state;
+        state.showDeviceCode = true;
+        state.userCode = L"QXR7-2KWM";
+        state.verificationUri = L"https://www.microsoft.com/link";
+        state.status = L"Microsoft sign-in expired";
+        state.detail = L"Restart the app to request a new code.";
+        state.isError = true;
+        return state;
+    } });
+    scenes.push_back({ L"signin-error", [] {
+        AuthUiState state;
+        state.showDeviceCode = true;
+        state.userCode = L"QXR7-2KWM";
+        state.verificationUri = L"https://www.microsoft.com/link";
+        state.status = L"Microsoft sign-in failed";
+        state.detail = L"Check your account and try again.";
+        state.isError = true;
+        state.secondsRemaining = 120;
+        return state;
+    } });
+
     scenes.push_back({ L"signin-loading", [] {
         AuthUiState state = Screen();
         state.status = L"Downloading Minecraft 1.21.11 libraries";

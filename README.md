@@ -12,6 +12,10 @@ LegacyForge Launcher is an experimental Minecraft Java Edition launcher intended
 - Application executable: `LegacyForge.exe`
 - Built package: `output/LegacyForge_<version>.appx`
 
+## Launcher UI V2
+
+The new QR-free account UI is being developed on a feature branch. See [UI V2 specification and Xbox test checklist](docs/UI-V2.md). The working Microsoft authentication and Minecraft launch logic remain unchanged.
+
 ## Build
 
 On Windows, install Visual Studio C++ build tools, a suitable Windows SDK, the required JDKs, and Git. From the repository root:
