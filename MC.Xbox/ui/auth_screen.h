@@ -1058,48 +1058,129 @@ public:
             return;
         }
 
-        const float dividerX = frame.left + (frame.right - frame.left) * 0.52f;
-        d2dContext_->DrawLine(
-            D2D1::Point2F(dividerX, frame.top + 32.0f),
-            D2D1::Point2F(dividerX, frame.bottom - 32.0f),
-            softEdge.Get(),
-            1.5f);
+        // LegacyForge Auth V2. This is a code-first experience: Microsoft device
+        // authorization is performed on a separate phone or PC. No QR is required.
+        const float frameWidth = frame.right - frame.left;
+        const float splitX = frame.left + frameWidth * 0.61f;
+        const float leftX = frame.left + 36.0f;
+        const float leftRight = splitX - 32.0f;
+        const float rightX = splitX + 12.0f;
+        const float rightRight = frame.right - 28.0f;
 
-        const D2D1_RECT_F titleRect = D2D1::RectF(frame.left + 42.0f, frame.top + 34.0f, dividerX - 42.0f, frame.top + 86.0f);
-        DrawText(title.c_str(), titleFormat_.Get(), titleRect, white.Get());
+        // Launcher masthead and Xbox-safe account instructions.
+        d2dContext_->FillRectangle(
+            D2D1::RectF(leftX, frame.top + 27.0f, leftX + 66.0f, frame.top + 32.0f), accent.Get());
+        DrawText(L"LEGACYFORGE", titleFormat_.Get(),
+            D2D1::RectF(leftX, frame.top + 42.0f, leftRight, frame.top + 100.0f), white.Get());
+        DrawText(L"MINECRAFT JAVA  /  XBOX SERIES X|S", captionFormat_.Get(),
+            D2D1::RectF(leftX + 2.0f, frame.top + 98.0f, leftRight, frame.top + 126.0f), muted.Get());
 
-        const D2D1_RECT_F codeBox = D2D1::RectF(frame.left + 42.0f, frame.top + 102.0f, dividerX - 42.0f, frame.top + 190.0f);
-        FillRound(codeBox, accentSoft.Get(), 14.0f);
-        StrokeRound(codeBox, accent.Get(), 14.0f, 2.0f);
+        DrawText(L"CONNECT MICROSOFT ACCOUNT", cardTitleFormat_.Get(),
+            D2D1::RectF(leftX, frame.top + 146.0f, leftRight, frame.top + 180.0f), accent.Get());
+        DrawText(L"Sign in to launch Minecraft Java Edition.",
+            smallFormat_.Get(),
+            D2D1::RectF(leftX, frame.top + 182.0f, leftRight, frame.top + 220.0f), white.Get());
+
+        DrawText(L"YOUR ONE-TIME SIGN-IN CODE", captionFormat_.Get(),
+            D2D1::RectF(leftX, frame.top + 226.0f, leftRight, frame.top + 253.0f), muted.Get());
+        const D2D1_RECT_F codeBox = D2D1::RectF(
+            leftX, frame.top + 254.0f, leftRight, frame.top + 343.0f);
+        FillRound(codeBox, accentSoft.Get(), 15.0f);
+        StrokeRound(codeBox, accent.Get(), 15.0f, 2.0f);
         if (!state.userCode.empty()) {
             DrawText(state.userCode.c_str(), codeFormat_.Get(), codeBox, white.Get());
+        } else {
+            DrawText(L"Requesting a code...", bodyMid_.Get(), codeBox, muted.Get());
         }
 
-        std::wstring instruction = L"Enter this code at";
-        std::wstring url = state.verificationUri.empty() ? L"microsoft.com/link" : state.verificationUri;
-        const D2D1_RECT_F bodyRect = D2D1::RectF(frame.left + 46.0f, frame.top + 218.0f, dividerX - 48.0f, frame.top + 326.0f);
-        DrawText((instruction + L"\n" + url).c_str(), bodyFormat_.Get(), bodyRect, white.Get());
+        DrawText(L"ON YOUR PHONE OR PC, OPEN", captionFormat_.Get(),
+            D2D1::RectF(leftX, frame.top + 360.0f, leftRight, frame.top + 387.0f), muted.Get());
+        const std::wstring signInUrl =
+            state.verificationUri.empty() ? L"https://www.microsoft.com/link" : state.verificationUri;
+        DrawText(signInUrl.c_str(), bodyFormat_.Get(),
+            D2D1::RectF(leftX, frame.top + 390.0f, leftRight, frame.top + 432.0f), accent.Get());
+        DrawText(L"Enter the code above, then approve the sign-in.\nUse the Microsoft account that owns Java Edition.",
+            smallFormat_.Get(),
+            D2D1::RectF(leftX, frame.top + 438.0f, leftRight, frame.top + 493.0f), white.Get());
 
-        std::wstring status = state.status;
-        if (state.secondsRemaining > 0) {
-            status += L"\nCode expires in " + std::to_wstring(state.secondsRemaining) + L" seconds";
-        }
-        const D2D1_RECT_F statusRect = D2D1::RectF(frame.left + 46.0f, frame.bottom - 116.0f, dividerX - 48.0f, frame.bottom - 38.0f);
-        DrawText(status.c_str(), smallFormat_.Get(), statusRect, state.isError ? danger.Get() : muted.Get());
-
+        // Status follows the existing device-code polling state, including failures.
+        const D2D1_RECT_F statusPanel = D2D1::RectF(
+            leftX, frame.bottom - 140.0f, leftRight, frame.bottom - 31.0f);
+        FillRound(statusPanel, surfaceFill.Get(), 13.0f);
+        StrokeRound(statusPanel, state.isError ? danger.Get() : softEdge.Get(),
+            13.0f, state.isError ? 2.0f : 1.0f);
+        DrawText(L"SIGN-IN STATUS", captionFormat_.Get(),
+            D2D1::RectF(statusPanel.left + 16.0f, statusPanel.top + 11.0f,
+                statusPanel.right - 16.0f, statusPanel.top + 35.0f), muted.Get());
+        DrawText(state.status.c_str(), smallMid_.Get(),
+            D2D1::RectF(statusPanel.left + 16.0f, statusPanel.top + 37.0f,
+                statusPanel.right - 16.0f, statusPanel.top + 69.0f),
+            state.isError ? danger.Get() : accent.Get());
         if (!state.detail.empty()) {
-            const D2D1_RECT_F detailRect = D2D1::RectF(frame.left + 46.0f, frame.bottom - 160.0f, dividerX - 48.0f, frame.bottom - 118.0f);
-            DrawText(state.detail.c_str(), smallFormat_.Get(), detailRect, muted.Get());
+            DrawText(state.detail.c_str(), captionFormat_.Get(),
+                D2D1::RectF(statusPanel.left + 16.0f, statusPanel.top + 71.0f,
+                    statusPanel.right - 16.0f, statusPanel.bottom - 5.0f), muted.Get());
         }
 
-        const float qrSide = (std::min)((frame.right - dividerX) * 0.55f, (frame.bottom - frame.top) * 0.58f);
-        const float qrLeft = dividerX + ((frame.right - dividerX) - qrSide) * 0.5f;
-        const float qrTop = frame.top + ((frame.bottom - frame.top) - qrSide) * 0.43f;
-        const D2D1_RECT_F qrRect = D2D1::RectF(qrLeft, qrTop, qrLeft + qrSide, qrTop + qrSide);
-        DrawQr(state.qr, qrRect, white.Get(), black.Get(), muted.Get());
+        // Right-hand welcome panel: fully native Direct2D artwork (no QR bitmap).
+        const D2D1_RECT_F guide = D2D1::RectF(
+            rightX, frame.top + 28.0f, rightRight, frame.bottom - 30.0f);
+        FillRound(guide, surfaceFill.Get(), 18.0f);
+        StrokeRound(guide, softEdge.Get(), 18.0f, 1.0f);
+        DrawText(L"JAVA EDITION", cardTitleFormat_.Get(),
+            D2D1::RectF(guide.left + 25.0f, guide.top + 27.0f,
+                guide.right - 20.0f, guide.top + 64.0f), white.Get());
+        DrawText(L"Minecraft, reforged for Xbox.",
+            captionFormat_.Get(),
+            D2D1::RectF(guide.left + 25.0f, guide.top + 68.0f,
+                guide.right - 20.0f, guide.top + 98.0f), muted.Get());
 
-        const D2D1_RECT_F qrLabel = D2D1::RectF(qrLeft, qrRect.bottom + 18.0f, qrLeft + qrSide, qrRect.bottom + 54.0f);
-        DrawText(L"Scan QR", smallFormat_.Get(), qrLabel, muted.Get());
+        // A simple block motif built from rectangles; safe to render on UWP.
+        const float centerX = (guide.left + guide.right) * 0.5f;
+        const float tile = 47.0f;
+        for (int y = 0; y < 2; ++y) {
+            for (int x = 0; x < 3; ++x) {
+                const float px = centerX - 1.5f * (tile + 9.0f) + x * (tile + 9.0f);
+                const float py = guide.top + 126.0f + y * (tile + 9.0f);
+                const D2D1_RECT_F block = D2D1::RectF(px, py, px + tile, py + tile);
+                FillRound(block, ((x + y) % 3 == 0) ? accent.Get() : accentSoft.Get(), 8.0f);
+                StrokeRound(block, accent.Get(), 8.0f, 1.0f);
+            }
+        }
+
+        DrawText(L"HOW TO CONNECT", cardTitleFormat_.Get(),
+            D2D1::RectF(guide.left + 25.0f, guide.top + 262.0f,
+                guide.right - 20.0f, guide.top + 300.0f), white.Get());
+
+        const wchar_t* steps[] = {
+            L"01   Open the Microsoft link",
+            L"02   Enter your one-time code",
+            L"03   Return here to play"
+        };
+        for (int i = 0; i < 3; ++i) {
+            const float y = guide.top + 310.0f + i * 55.0f;
+            DrawText(steps[i], smallMid_.Get(),
+                D2D1::RectF(guide.left + 26.0f, y, guide.right - 14.0f, y + 38.0f),
+                (i == 0) ? accent.Get() : white.Get());
+        }
+
+        std::wstring expiry = L"Waiting for device authorization";
+        if (state.secondsRemaining > 0) {
+            wchar_t countDown[64] = {};
+            swprintf_s(countDown, L"Code expires in %d:%02d",
+                state.secondsRemaining / 60, state.secondsRemaining % 60);
+            expiry = countDown;
+        } else if (state.isError) {
+            expiry = L"Sign-in needs attention";
+        }
+        DrawText(expiry.c_str(), captionFormat_.Get(),
+            D2D1::RectF(guide.left + 25.0f, guide.bottom - 78.0f,
+                guide.right - 20.0f, guide.bottom - 51.0f),
+            state.isError ? danger.Get() : muted.Get());
+        DrawText(L"No QR code needed. This screen updates automatically.",
+            captionFormat_.Get(),
+            D2D1::RectF(guide.left + 25.0f, guide.bottom - 49.0f,
+                guide.right - 18.0f, guide.bottom - 10.0f), muted.Get());
 
         finishDraw();
     }
@@ -1709,31 +1790,4 @@ private:
         popClip();
     }
 
-    void DrawQr(const QrMatrix& qr, D2D1_RECT_F rect, ID2D1Brush* white, ID2D1Brush* black, ID2D1Brush* muted) {
-        d2dContext_->FillRectangle(rect, white);
-        if (qr.empty()) {
-            DrawText(L"QR", codeFormat_.Get(), rect, muted);
-            return;
-        }
-
-        constexpr int quiet = 4;
-        const float module = (std::min)(
-            (rect.right - rect.left) / static_cast<float>(qr.size + quiet * 2),
-            (rect.bottom - rect.top) / static_cast<float>(qr.size + quiet * 2));
-        const float qrDraw = module * static_cast<float>(qr.size + quiet * 2);
-        const float startX = rect.left + ((rect.right - rect.left) - qrDraw) * 0.5f + module * quiet;
-        const float startY = rect.top + ((rect.bottom - rect.top) - qrDraw) * 0.5f + module * quiet;
-
-        for (int y = 0; y < qr.size; ++y) {
-            for (int x = 0; x < qr.size; ++x) {
-                if (!qr.at(x, y)) continue;
-                const D2D1_RECT_F moduleRect = D2D1::RectF(
-                    startX + x * module,
-                    startY + y * module,
-                    startX + (x + 1) * module + 0.25f,
-                    startY + (y + 1) * module + 0.25f);
-                d2dContext_->FillRectangle(moduleRect, black);
-            }
-        }
-    }
 };

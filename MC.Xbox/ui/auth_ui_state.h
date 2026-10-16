@@ -8,7 +8,6 @@
 
 #include "mod_types.h"
 #include "profiles.h"
-#include "qr_code.h"
 
 constexpr int kModsTargetRowsVisible = 10;
 
@@ -72,7 +71,6 @@ struct AuthUiState {
     std::vector<ModCard> modsCards;
     float animation = 0.0f;
     float progress = -1.0f;
-    QrMatrix qr;
     bool showLaunchLog = false;
     std::wstring launchLogText;
 

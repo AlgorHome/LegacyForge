@@ -10,7 +10,6 @@
 #include "minecraft_launch.h"
 #include "profiles.h"
 #include "remote_file_server.h"
-#include "qr_code.h"
 #include "telemetry.h"
 
 #include <chrono>
@@ -721,7 +720,6 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
 
     state.userCode = a2w(device.userCode.c_str());
     state.verificationUri = a2w(device.verificationUri.c_str());
-    state.qr = GenerateLoginQrMatrix("https://www.microsoft.com/link?otc=" + device.userCode);
     state.title = L"Microsoft sign-in";
     state.showDeviceCode = true;
     state.progress = -1.0f;
