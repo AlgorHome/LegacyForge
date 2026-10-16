@@ -208,6 +208,24 @@ std::vector<Scene> Scenes() {
         state.selectedMenuIndex = 1;
         return state;
     } });
+    scenes.push_back({ L"accounts-default", [] {
+        AuthUiState state = Screen();
+        state.showAccounts = true;
+        state.showMainMenu = false;
+        state.homePlayerName = L"Steve";
+        state.selectedAccountIndex = 0;
+        state.accountsMessage = L"A  Select an option  |  B  Back";
+        return state;
+    } });
+    scenes.push_back({ L"accounts-local", [] {
+        AuthUiState state = Screen();
+        state.showAccounts = true;
+        state.showMainMenu = false;
+        state.homePlayerName = L"Steve";
+        state.selectedAccountIndex = 1;
+        state.accountsMessage = L"Local launcher profiles are planned, not enabled yet.";
+        return state;
+    } });
     scenes.push_back({ L"home-no-profile", [] {
         AuthUiState state = Screen();
         state.showMainMenu = true;

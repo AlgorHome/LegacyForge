@@ -579,6 +579,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
     bool upWasDown = false;
     bool downWasDown = false;
     bool selectWasDown = false;
+    bool accountBackWasDown = false;
 
     ShowCrashScreen(window, renderer, state);
 
@@ -599,6 +600,63 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                 selected = hovered;
             }
         }
+        if (state.showAccounts) {
+            state.animation = static_cast<float>((GetTickCount64() % 100000) / 1000.0);
+            RenderAuth(renderer, state);
+            const bool goUp = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Up,
+                ABI::Windows::System::VirtualKey_GamepadDPadUp
+            });
+            const bool goDown = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Down,
+                ABI::Windows::System::VirtualKey_GamepadDPadDown
+            });
+            const bool goSelect = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Enter,
+                ABI::Windows::System::VirtualKey_GamepadA
+            });
+            const bool goBack = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Escape,
+                ABI::Windows::System::VirtualKey_GamepadB
+            });
+            if (goUp && !upWasDown) {
+                state.selectedAccountIndex = (state.selectedAccountIndex + 4) % 5;
+            }
+            if (goDown && !downWasDown) {
+                state.selectedAccountIndex = (state.selectedAccountIndex + 1) % 5;
+            }
+            if (goSelect && !selectWasDown) {
+                switch (state.selectedAccountIndex) {
+                case 0:
+                    state.accountsMessage = L"Microsoft account connected. Use Sign out on Home to switch.";
+                    break;
+                case 1:
+                    state.accountsMessage = L"Local launcher profiles are planned, not enabled yet.";
+                    break;
+                case 2:
+                    state.accountsMessage = L"Ely.by integration is not implemented yet.";
+                    break;
+                case 3:
+                    state.accountsMessage = L"Get Minecraft Java Edition from minecraft.net.";
+                    break;
+                default:
+                    state.accountsMessage = L"Only Microsoft verifies ownership in this build.";
+                    break;
+                }
+            }
+            if (goBack && !accountBackWasDown) {
+                state.showAccounts = false;
+                state.showMainMenu = true;
+            }
+            upWasDown = goUp;
+            downWasDown = goDown;
+            selectWasDown = goSelect;
+            accountBackWasDown = goBack;
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            continue;
+        }
+        // Release previous Account-panel keys before accepting Home input.
+        accountBackWasDown = false;
         state.selectedMenuIndex = selected;
         state.animation = static_cast<float>((GetTickCount64() % 100000) / 1000.0);
         RenderAuth(renderer, state);
@@ -639,12 +697,18 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                 ShowModsPage(window, renderer, state, runtimeRoot);
                 refreshHomeSummary();
             } else if (selected == 2) {
+                WriteLog(L"Main menu: Accounts selected");
+                state.showMainMenu = false;
+                state.showAccounts = true;
+                state.selectedAccountIndex = 0;
+                state.accountsMessage = L"A  Select an option  |  B  Back";
+            } else if (selected == 3) {
                 WriteLog(L"Main menu: Remote files selected");
                 ShowRemoteFilesPage(window, renderer, state, runtimeRoot);
-            } else if (selected == 3) {
+            } else if (selected == 4) {
                 WriteLog(L"Main menu: Settings selected");
                 ShowSettingsPage(window, renderer, state);
-            } else if (selected == 4) {
+            } else if (selected == 5) {
                 WriteLog(L"Main menu: Repair downloads selected");
                 StopRemoteFileServer();
                 state.status = L"Repairing downloaded files";
