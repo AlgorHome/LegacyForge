@@ -6,7 +6,7 @@ This page describes how the Bandit Launcher UWP host is organized after the `App
 
 Bandit Launcher is a single UWP process that:
 
-1. Authenticates the user with Microsoft and verifies Minecraft Java ownership.
+1. Authenticates the user with Microsoft or guest.
 2. Manages profiles, mods, and launcher UI state.
 3. Verifies and downloads official runtime files into `LocalState`.
 4. Embeds the JVM, applies loader specific launch rules, and starts Minecraft.
@@ -198,9 +198,3 @@ Changing the default target requires updating `scripts/config.ps1` and usually `
 | Change recommended mods | `config/recommended-mods.json` |
 | Change remote uploads | `net/remote_file_server.cpp` |
 | Change relay mouse behavior | `mouse_support/`, `glfw_shim/glfw_uwp.cpp`, `ui/launcher_mouse.cpp`, `net/web_relay_server.cpp` |
-
-## Auth Boundary
-
-Bandit Launcher requires legitimate Microsoft/Xbox authentication and Minecraft entitlement verification. Architecture changes must keep that boundary intact. Do not add offline fallbacks, optional auth switches, or alternate launch paths that skip ownership checks.
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) and [LEGAL.md](LEGAL.md).
