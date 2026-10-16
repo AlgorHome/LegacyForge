@@ -94,3 +94,7 @@ This document captures design and engineering requirements. It is **not** eviden
 ## Home V2 implementation note
 
 The first implementation retains exactly six functional actions. Index 0 is the large Play button and indices 1–5 are sidebar buttons: Profiles & Mods (existing Mods page, which includes Profiles), Remote Files, Settings, Repair downloads, and Sign out. No dedicated Accounts action is shown until account-management code exists. Player, active profile, Minecraft target and mod count are populated from runtime state. The desktop preview includes `main-menu`, `home-mods-focus` and `home-no-profile` scenes. Build/hardware checks remain required.
+
+## Accounts UI V2 first implementation
+
+The Accounts navigation entry and account-options page are implemented on `feature/legacyforge-accounts-v2`, pending compilation and Xbox testing. Microsoft remains the existing authenticated account, while Local Profile and Ely.by display explicit *coming later* status. Get Minecraft and Help present information rather than opening external links. D-pad up/down moves option focus, A displays option information, B returns Home. No provider credentials are requested and no alternate Minecraft entitlement flow is present.

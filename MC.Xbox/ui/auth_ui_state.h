@@ -11,7 +11,7 @@
 
 constexpr int kModsTargetRowsVisible = 10;
 
-constexpr int kMainMenuItems = 6;
+constexpr int kMainMenuItems = 7;
 
 struct AuthUiState {
     std::wstring title;
@@ -23,6 +23,9 @@ struct AuthUiState {
     bool isError = false;
     bool showDeviceCode = true;
     bool showMainMenu = false;
+    bool showAccounts = false;
+    int selectedAccountIndex = 0;
+    std::wstring accountsMessage = L"A  Select an option";
     bool showRemoteFiles = false;
     bool showModsPage = false;
     int selectedMenuIndex = 0;

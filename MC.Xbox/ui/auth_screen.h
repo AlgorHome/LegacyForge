@@ -924,9 +924,89 @@ public:
             return;
         }
 
+
+        if (state.showAccounts) {
+            const float left = frame.left + 39.0f;
+            const float right = frame.right - 39.0f;
+            const float top = frame.top + 33.0f;
+            const float bottom = frame.bottom - 30.0f;
+            const float mid = left + (right - left) * 0.41f;
+
+            DrawText(L"ACCOUNTS", titleFormat_.Get(),
+                D2D1::RectF(left, top, right, top + 55.0f), white.Get());
+            DrawText(L"Manage your launcher identity  |  B  Back to Home",
+                captionFormat_.Get(),
+                D2D1::RectF(left, top + 56.0f, right, top + 88.0f), muted.Get());
+
+            const D2D1_RECT_F saved = D2D1::RectF(left, top + 103.0f, mid - 14.0f, bottom);
+            const D2D1_RECT_F methods = D2D1::RectF(mid + 3.0f, top + 103.0f, right, bottom);
+            FillRound(saved, surfaceFill.Get(), 15.0f);
+            FillRound(methods, surfaceFill.Get(), 15.0f);
+            StrokeRound(saved, softEdge.Get(), 15.0f, 1.0f);
+            StrokeRound(methods, softEdge.Get(), 15.0f, 1.0f);
+
+            DrawText(L"ACTIVE ACCOUNT", cardTitleFormat_.Get(),
+                D2D1::RectF(saved.left + 18.0f, saved.top + 18.0f,
+                    saved.right - 14.0f, saved.top + 54.0f), white.Get());
+            const D2D1_RECT_F linked = D2D1::RectF(
+                saved.left + 18.0f, saved.top + 78.0f, saved.right - 18.0f, saved.top + 184.0f);
+            FillRound(linked, accentSoft.Get(), 12.0f);
+            StrokeRound(linked, accent.Get(), 12.0f, 1.0f);
+            DrawText(L"MICROSOFT  /  CONNECTED", captionFormat_.Get(),
+                D2D1::RectF(linked.left + 15.0f, linked.top + 9.0f,
+                    linked.right - 12.0f, linked.top + 36.0f), accent.Get());
+            const std::wstring accountName = state.homePlayerName.empty()
+                ? std::wstring(L"Signed in") : state.homePlayerName;
+            DrawText(accountName.c_str(), bodyMid_.Get(),
+                D2D1::RectF(linked.left + 15.0f, linked.top + 43.0f,
+                    linked.right - 12.0f, linked.bottom - 11.0f), white.Get());
+            DrawText(L"Your Microsoft account remains the default.\n"
+                L"Other providers do not verify Minecraft ownership.",
+                smallFormat_.Get(),
+                D2D1::RectF(saved.left + 18.0f, saved.top + 208.0f,
+                    saved.right - 18.0f, saved.top + 285.0f), muted.Get());
+
+            DrawText(L"ADD ACCOUNT / OPTIONS", cardTitleFormat_.Get(),
+                D2D1::RectF(methods.left + 20.0f, methods.top + 18.0f,
+                    methods.right - 16.0f, methods.top + 54.0f), white.Get());
+            const wchar_t* names[] = {
+                L"Microsoft Account", L"Local Profile",
+                L"Custom Skin Service (Ely.by)", L"Get Minecraft", L"Account Help"
+            };
+            const wchar_t* hints[] = {
+                L"Default  /  connected", L"Local identity  /  coming later",
+                L"Optional service  /  coming later", L"Official information",
+                L"Sign-in and ownership guidance"
+            };
+            const float optionTop = methods.top + 76.0f;
+            const float optionH = 65.0f;
+            for (int i = 0; i < 5; ++i) {
+                const float y = optionTop + i * 70.0f;
+                const D2D1_RECT_F rect = D2D1::RectF(
+                    methods.left + 18.0f, y, methods.right - 18.0f, y + optionH);
+                const bool selected = i == state.selectedAccountIndex;
+                if (selected) GlowSelect(rect, 11.0f);
+                FillRound(rect, selected ? accentSoft.Get() : panel.Get(), 10.0f);
+                StrokeRound(rect, selected ? accent.Get() : softEdge.Get(),
+                    10.0f, selected ? 2.5f : 1.0f);
+                DrawText(names[i], smallMid_.Get(),
+                    D2D1::RectF(rect.left + 15.0f, rect.top + 4.0f,
+                        rect.right - 14.0f, rect.top + 34.0f),
+                    selected ? accent.Get() : white.Get());
+                DrawText(hints[i], captionFormat_.Get(),
+                    D2D1::RectF(rect.left + 15.0f, rect.top + 34.0f,
+                        rect.right - 14.0f, rect.bottom - 3.0f), muted.Get());
+            }
+            DrawText(state.accountsMessage.c_str(), captionFormat_.Get(),
+                D2D1::RectF(methods.left + 20.0f, methods.bottom - 43.0f,
+                    methods.right - 16.0f, methods.bottom - 9.0f), accent.Get());
+            finishDraw();
+            return;
+        }
+
         if (state.showMainMenu) {
-            // Home V2: keep the six existing actions and their indices.
-            // Index 0 is the large Play button, 1..5 are sidebar entries.
+            // Home V2: Play index 0, Profiles index 1, Accounts index 2;
+            // remaining existing actions are shifted to indices 3..6.
             const float left = frame.left + 38.0f;
             const float right = frame.right - 38.0f;
             const float headerTop = frame.top + 22.0f;
@@ -981,15 +1061,16 @@ public:
                     profile.right - 16.0f, profile.bottom - 6.0f), muted.Get());
 
             const wchar_t* labels[] = {
-                L"Profiles & Mods", L"Remote Files", L"Settings",
-                L"Repair downloads", L"Sign out"
+                L"Profiles & Mods", L"Accounts", L"Remote Files",
+                L"Settings", L"Repair downloads", L"Sign out"
             };
             const wchar_t* icons[] = {
-                L"\uE74C", L"\uE838", L"\uE713", L"\uE72C", L"\uE7E8"
+                L"\uE74C", L"\uE77B", L"\uE838",
+                L"\uE713", L"\uE72C", L"\uE7E8"
             };
             const float navTop = profile.bottom + 12.0f;
-            const float navHeight = 55.0f;
-            const float navGap = 7.0f;
+            const float navHeight = 49.0f;
+            const float navGap = 5.0f;
             for (int i = 1; i < kMainMenuItems; ++i) {
                 const float y = navTop + static_cast<float>(i - 1) * (navHeight + navGap);
                 const D2D1_RECT_F button = D2D1::RectF(left, y, leftRight, y + navHeight);
