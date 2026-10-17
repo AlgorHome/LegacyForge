@@ -324,6 +324,25 @@ static void RecordProfileModInstall(
     WriteProfileModInstallMetaFromModsDir(userModsDir, fileName, meta);
 }
 
+// A previous interrupted transfer may leave a staging file. Never reuse it
+// unless removal succeeds; otherwise a retry could ingest stale bytes.
+static bool PrepareDownloadStage(const std::wstring& path, std::wstring& error) {
+    const DWORD attributes = GetFileAttributesW(path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES) return true;
+    if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+        error = L"Download staging path is a directory; cannot safely retry";
+        return false;
+    }
+    if (DeleteFileW(path.c_str())) {
+        WriteLogF(L"Removed stale download staging file: %s", path.c_str());
+        return true;
+    }
+    error = L"Could not clear partial download (Windows error " +
+        std::to_wstring(GetLastError()) + L"). Close other users of the file and retry.";
+    WriteLogF(L"Failed to remove staging file: %s", path.c_str());
+    return false;
+}
+
 static bool IsDisabledProfileMod(const std::wstring& name) {
     const std::wstring suffix = L".jar.disabled";
     return name.size() >= suffix.size() &&
@@ -918,7 +937,7 @@ static bool InstallModrinthProjectRecursive(
             }
 
             const std::wstring tempPath = destination + L".download";
-            DeleteFileW(tempPath.c_str());
+            if (!PrepareDownloadStage(tempPath, error)) return false;
             WriteLogF(L"Downloading Modrinth mod candidate %s", filename.c_str());
             SetInstallStatus(L"Checking " + filename);
             if (!DownloadUrlToFile(downloadUrl, tempPath, MakeInstallProgress(L"Checking " + filename, fileSize))) {
@@ -1075,7 +1094,7 @@ static bool InstallCurseForgeProjectRecursive(
     }
 
     const std::wstring tempPath = destination + L".download";
-    DeleteFileW(tempPath.c_str());
+    if (!PrepareDownloadStage(tempPath, error)) return false;
     WriteLogF(L"Downloading CurseForge file %s", file.fileName.c_str());
     SetInstallStatus(L"Checking " + file.fileName);
     if (!curseforge::DownloadFile(file, tempPath, MakeInstallProgress(L"Checking " + file.fileName, file.fileSize))) {
@@ -1242,12 +1261,16 @@ static bool InstallModpack(const ModCard& card, const std::wstring& runtimeRoot,
     const std::wstring cacheDir = runtimeRoot + L"\\.modpack-cache";
     EnsureDirectoryTree(cacheDir);
     const std::wstring mrPath = cacheDir + L"\\" + SafeFileName(mrName);
-    DeleteFileW(mrPath.c_str());
+    if (!PrepareDownloadStage(mrPath, error)) return false;
     const auto progress = MakeInstallProgress(L"Downloading " + card.title, mrSize);
     const bool fetched = fromCurseForge
         ? curseforge::DownloadFile(packFile, mrPath, progress)
         : DownloadUrlToFile(mrUrl, mrPath, progress);
-    if (!fetched) { error = L"Pack download failed"; return false; }
+    if (!fetched) {
+        DeleteFileW(mrPath.c_str());
+        error = L"Pack download failed";
+        return false;
+    }
     if (!mrSha1.empty() && !FileMatchesSha1(mrPath, mrSha1)) {
         DeleteFileW(mrPath.c_str());
         error = L"Pack verification failed";
@@ -1321,7 +1344,7 @@ static bool InstallContentPack(
     }
 
     const std::wstring tempPath = destination + L".download";
-    DeleteFileW(tempPath.c_str());
+    if (!PrepareDownloadStage(tempPath, error)) return false;
     const auto progress = MakeInstallProgress(L"Downloading " + card.title, size);
     const bool fetched = fromCurseForge
         ? curseforge::DownloadFile(cfFile, tempPath, progress)
