@@ -701,6 +701,15 @@ std::vector<std::wstring> ListProfileMods(const std::wstring& runtimeRoot, const
         do { if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) out.push_back(fd.cFileName); } while (FindNextFileW(h, &fd));
         FindClose(h);
     }
+    // Disabled mod files are kept in the same profile, but are not loaded
+    // by Minecraft because their filenames no longer end with .jar.
+    WIN32_FIND_DATAW disabledFd;
+    HANDLE disabled = FindFirstFileW((ProfileModsDir(runtimeRoot, id) + L"\\*.jar.disabled").c_str(), &disabledFd);
+    if (disabled != INVALID_HANDLE_VALUE) {
+        do { if (!(disabledFd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) out.push_back(disabledFd.cFileName); }
+        while (FindNextFileW(disabled, &disabledFd));
+        FindClose(disabled);
+    }
     std::sort(out.begin(), out.end());
     return out;
 }

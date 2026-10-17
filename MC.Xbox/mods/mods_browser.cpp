@@ -324,17 +324,40 @@ static void RecordProfileModInstall(
     WriteProfileModInstallMetaFromModsDir(userModsDir, fileName, meta);
 }
 
+static bool IsDisabledProfileMod(const std::wstring& name) {
+    const std::wstring suffix = L".jar.disabled";
+    return name.size() >= suffix.size() &&
+        ToLowerW(name.substr(name.size() - suffix.size())) == suffix;
+}
+
+static std::wstring ProfileModMetadataName(const std::wstring& name) {
+    return IsDisabledProfileMod(name) ? name.substr(0, name.size() - 9) : name;
+}
+
+static bool ToggleProfileMod(const std::wstring& runtimeRoot,
+                             const std::wstring& profileId,
+                             const std::wstring& name,
+                             std::wstring& newName) {
+    const bool disabled = IsDisabledProfileMod(name);
+    newName = disabled ? ProfileModMetadataName(name) : name + L".disabled";
+    const std::wstring directory = ProfileModsDir(runtimeRoot, profileId);
+    const std::wstring destination = directory + L"\\" + newName;
+    if (GetFileAttributesW(destination.c_str()) != INVALID_FILE_ATTRIBUTES) return false;
+    return MoveFileExW((directory + L"\\" + name).c_str(), destination.c_str(), 0) != 0;
+}
+
 static int RemoveProfileModAndUnusedDependencies(const std::wstring& runtimeRoot, const std::wstring& profileId, const std::wstring& jarName) {
     const std::wstring modsDir = ProfileModsDir(runtimeRoot, profileId);
+    const std::wstring metadataName = ProfileModMetadataName(jarName);
     ProfileModInstallMeta removedMeta;
-    const bool hasMeta = ReadProfileModInstallMetaFromModsDir(modsDir, jarName, removedMeta);
+    const bool hasMeta = ReadProfileModInstallMetaFromModsDir(modsDir, metadataName, removedMeta);
 
     int removed = 0;
     if (DeleteFileW((modsDir + L"\\" + jarName).c_str())) {
         ++removed;
     }
-    DeleteFileW(ModMetaPath(runtimeRoot, jarName).c_str());
-    DeleteFileW(ProfileModInstallMetaPathFromModsDir(modsDir, jarName).c_str());
+    DeleteFileW(ModMetaPath(runtimeRoot, metadataName).c_str());
+    DeleteFileW(ProfileModInstallMetaPathFromModsDir(modsDir, metadataName).c_str());
 
     if (!hasMeta || removedMeta.projectId.empty()) {
         return removed;
@@ -343,7 +366,7 @@ static int RemoveProfileModAndUnusedDependencies(const std::wstring& runtimeRoot
     const std::vector<std::wstring> remaining = ListProfileMods(runtimeRoot, profileId);
     for (const std::wstring& candidate : remaining) {
         ProfileModInstallMeta meta;
-        if (!ReadProfileModInstallMetaFromModsDir(modsDir, candidate, meta)) continue;
+        if (!ReadProfileModInstallMetaFromModsDir(modsDir, ProfileModMetadataName(candidate), meta)) continue;
         if (!meta.dependency) continue;
         const size_t erased = meta.requiredBy.erase(removedMeta.projectId);
         if (erased == 0) continue;
@@ -353,10 +376,10 @@ static int RemoveProfileModAndUnusedDependencies(const std::wstring& runtimeRoot
                 ++removed;
                 WriteLogF(L"Removed unused dependency mod: %s", candidate.c_str());
             }
-            DeleteFileW(ModMetaPath(runtimeRoot, candidate).c_str());
-            DeleteFileW(ProfileModInstallMetaPathFromModsDir(modsDir, candidate).c_str());
+            DeleteFileW(ModMetaPath(runtimeRoot, ProfileModMetadataName(candidate)).c_str());
+            DeleteFileW(ProfileModInstallMetaPathFromModsDir(modsDir, ProfileModMetadataName(candidate)).c_str());
         } else {
-            WriteProfileModInstallMetaFromModsDir(modsDir, candidate, meta);
+            WriteProfileModInstallMetaFromModsDir(modsDir, ProfileModMetadataName(candidate), meta);
         }
     }
 
@@ -1390,6 +1413,7 @@ static ProfileDependencySnapshot ReadProfileDependencySnapshot(
     const std::vector<std::wstring> jars = ListProfileMods(runtimeRoot, profileId);
     result.jarCount = static_cast<int>(jars.size());
     for (const std::wstring& jar : jars) {
+        if (IsDisabledProfileMod(jar)) continue;
         ProfileModInstallMeta meta;
         if (!ReadProfileModInstallMetaFromModsDir(modsDir, jar, meta) || meta.projectId.empty()) {
             result.complete = false;
@@ -2664,7 +2688,29 @@ void ShowModsPage(
                     state.status = L"Deleted " + gone + L". Use Undo deleted profile to restore it.";
                 }
             } else if ((selectDown && !selectWasDown) || (enterDown && !enterWasDown) || clickActivate) {
-                if (state.modsProfileFocus == 1 && !state.modsProfileBuiltin) {
+                if (gridFocus && pmTotal > 0 && state.modsProfileSel >= 0 &&
+                    state.modsProfileSel < pmTotal) {
+                    const std::wstring oldName = state.modsProfileMods[static_cast<size_t>(state.modsProfileSel)];
+                    std::wstring newName;
+                    if (ToggleProfileMod(runtimeRoot, state.modsProfileId, oldName, newName)) {
+                        pendingModRemoval.clear();
+                        state.modsProfileMods = ListProfileMods(runtimeRoot, state.modsProfileId);
+                        for (int idx = 0; idx < static_cast<int>(state.modsProfileMods.size()); ++idx) {
+                            if (state.modsProfileMods[static_cast<size_t>(idx)] == newName) {
+                                state.modsProfileSel = idx;
+                                break;
+                            }
+                        }
+                        pmEnsureVisible();
+                        state.status = IsDisabledProfileMod(newName)
+                            ? L"Disabled " + oldName + L" (A to re-enable)"
+                            : L"Enabled " + newName;
+                        state.isError = false;
+                    } else {
+                        state.status = L"Could not toggle mod " + oldName;
+                        state.isError = true;
+                    }
+                } else if (state.modsProfileFocus == 1 && !state.modsProfileBuiltin) {
                     const std::wstring gone = state.modsProfileName;
                     DeleteProfile(runtimeRoot, state.modsProfileId);
                     state.modsProfileOpen = false;

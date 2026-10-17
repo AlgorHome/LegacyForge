@@ -440,7 +440,7 @@ public:
                 if (state.modsRenaming) {
                     profileHint = L"Type a name, then close the keyboard to save";
                 } else if (!state.modsProfileBuiltin) {
-                    if (gridFocus) profileHint = L"B  Back      X  Remove mod      Y  Rename";
+                    if (gridFocus) profileHint = L"A  Enable/disable      X  Remove mod      Y  Rename      B  Back";
                     else if (state.modsProfileFocus == 4) profileHint = L"B  Back      A  Export .mrpack for PC";
                     else if (state.modsProfileFocus == 5) profileHint = L"B  Back      A  Toggle built-in controller mod      Y Rename";
                     else profileHint = L"B  Back      A select      X Delete      Y Rename";
@@ -498,7 +498,11 @@ public:
                             StrokeRound(card, sel ? accent.Get() : softEdge.Get(), 12.0f, sel ? 3.0f : 1.0f);
                             DrawIcon(L"\uE74C", D2D1::RectF(card.left + 10.0f, card.top, card.left + 44.0f, card.bottom), sel ? accent.Get() : muted.Get());
                             std::wstring nm = state.modsProfileMods[static_cast<size_t>(i)];
-                            if (nm.size() > 4 && nm.compare(nm.size() - 4, 4, L".jar") == 0) nm = nm.substr(0, nm.size() - 4);
+                            const std::wstring disabledSuffix = L".jar.disabled";
+                            const bool disabledMod = nm.size() >= disabledSuffix.size() &&
+                                nm.compare(nm.size() - disabledSuffix.size(), disabledSuffix.size(), disabledSuffix) == 0;
+                            if (disabledMod) nm = nm.substr(0, nm.size() - disabledSuffix.size()) + L" [OFF]";
+                            else if (nm.size() > 4 && nm.compare(nm.size() - 4, 4, L".jar") == 0) nm = nm.substr(0, nm.size() - 4);
                             DrawText(nm.c_str(), smallMid_.Get(),
                                 D2D1::RectF(card.left + 48.0f, card.top, card.right - 12.0f, card.bottom), white.Get());
                         }
