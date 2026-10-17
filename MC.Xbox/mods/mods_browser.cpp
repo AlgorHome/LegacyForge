@@ -1377,8 +1377,32 @@ static std::wstring CleanMarkdown(const std::wstring& in,
 }
 
 
+struct ProfileDependencySnapshot {
+    std::set<std::wstring> projectIds;
+    bool complete = true;
+    int jarCount = 0;
+};
+
+static ProfileDependencySnapshot ReadProfileDependencySnapshot(
+    const std::wstring& runtimeRoot, const std::wstring& profileId) {
+    ProfileDependencySnapshot result;
+    const std::wstring modsDir = ProfileModsDir(runtimeRoot, profileId);
+    const std::vector<std::wstring> jars = ListProfileMods(runtimeRoot, profileId);
+    result.jarCount = static_cast<int>(jars.size());
+    for (const std::wstring& jar : jars) {
+        ProfileModInstallMeta meta;
+        if (!ReadProfileModInstallMetaFromModsDir(modsDir, jar, meta) || meta.projectId.empty()) {
+            result.complete = false;
+            continue;
+        }
+        result.projectIds.insert(ToLowerW(meta.projectId));
+    }
+    return result;
+}
+
 static std::wstring FetchModrinthDependencySummary(const std::wstring& idOrSlug,
-                                                    const LaunchTarget& target) {
+                                                    const LaunchTarget& target,
+                                                    const ProfileDependencySnapshot& snapshot) {
     using namespace winrt::Windows::Data::Json;
     if (idOrSlug.empty() || target.minecraftVersion.empty()) return L"\n\nDEPENDENCIES\nTarget information unavailable.";
     const std::string gameVersions = "[\"" + w2a(target.minecraftVersion) + "\"]";
@@ -1420,13 +1444,19 @@ static std::wstring FetchModrinthDependencySummary(const std::wstring& idOrSlug,
                 if (required > 8) continue;
                 const std::wstring project = JsonStringOrEmpty(dep, L"project_id");
                 const std::wstring version = JsonStringOrEmpty(dep, L"version_id");
-                summary += L"- " + (!project.empty() ? project :
-                    (!version.empty() ? (L"Version " + version) : L"Unnamed required dependency")) + L"\n";
+                const std::wstring displayId = !project.empty() ? project :
+                    (!version.empty() ? (L"Version " + version) : L"Unnamed required dependency");
+                const bool identified = !project.empty();
+                const bool installed = identified &&
+                    snapshot.projectIds.find(ToLowerW(project)) != snapshot.projectIds.end();
+                const wchar_t* status = installed ? L"Installed (recorded)" :
+                    (!identified || !snapshot.complete ? L"Unknown" : L"Missing from this profile");
+                summary += L"- " + displayId + L"  [" + status + L"]\n";
             }
         }
         if (!required) summary += L"No required dependencies declared for this release.\n";
         if (required > 8) summary += L"... and " + std::to_wstring(required - 8) + L" more.\n";
-        summary += L"Installed/missing status not verified. Some mods require extra libraries not listed by the API.";
+        summary += L"Compared with the selected profile's recorded mod IDs. Missing means absent from a fully indexed profile; Unknown means metadata is incomplete. Xbox runtime remains unverified.";
         return summary;
     } catch (const winrt::hresult_error&) {
         return L"\n\nDEPENDENCIES\nCould not parse dependency metadata.";
@@ -1471,19 +1501,20 @@ static std::wstring g_detailBody;
 static std::wstring g_detailMeta;
 static std::vector<std::pair<UINT32, UINT32>> g_detailBold;
 static std::vector<std::pair<UINT32, UINT32>> g_detailHead;
-static unsigned StartDetailFetch(const ModCard& card, const LaunchTarget& target) {
+static unsigned StartDetailFetch(const ModCard& card, const LaunchTarget& target,
+                                 const ProfileDependencySnapshot& snapshot) {
     const unsigned id = ++g_detailReqId;
     const std::wstring idOrSlug = !card.projectId.empty() ? card.projectId : card.slug;
     const ModSource source = card.source;
     g_detailFetching.store(true);
-    std::thread([id, idOrSlug, source, target]() {
+    std::thread([id, idOrSlug, source, target, snapshot]() {
         std::wstring body, meta;
         std::vector<std::pair<UINT32, UINT32>> bold, head;
         if (source == ModSource::CurseForge) {
             curseforge::FetchDetail(idOrSlug, body, meta, bold, head);
         } else {
             FetchProjectDetail(idOrSlug, target, body, meta, bold, head);
-            body += FetchModrinthDependencySummary(idOrSlug, target);
+            body += FetchModrinthDependencySummary(idOrSlug, target, snapshot);
         }
         std::lock_guard<std::mutex> lk(g_detailMutex);
         if (id == g_detailReqId.load()) {
@@ -2981,7 +3012,8 @@ void ShowModsPage(
                     state.modsDetailHead.clear();
                     state.modsDetailMeta.clear();
                     state.modsDetailLoading = true;
-                    state.modsDetailReqId = StartDetailFetch(selected, CurrentModsTarget(state));
+                    state.modsDetailReqId = StartDetailFetch(selected, CurrentModsTarget(state),
+                        ReadProfileDependencySnapshot(runtimeRoot, GetActiveProfileId(runtimeRoot)));
                     ApplyCompatFlag(state, selected);
                     const LaunchTarget detailTarget = CurrentModsTarget(state);
                     state.modsCompatContext = L"Browse target: " + TargetProfileText(detailTarget) +
