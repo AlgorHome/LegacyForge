@@ -1,6 +1,7 @@
 #pragma once
 
 #include "auth_ui_state.h"
+#include "installed_highlight.h"
 #include "launcher_common.h"
 #include "launcher_mouse.h"
 #include "mods_ui_globals.h"
@@ -201,6 +202,7 @@ public:
         ComPtr<ID2D1SolidColorBrush> softEdge;
         ComPtr<ID2D1SolidColorBrush> surfaceFill;
         ComPtr<ID2D1SolidColorBrush> accentSoft;
+        ComPtr<ID2D1SolidColorBrush> installedHighlight;
 
         d2dContext_->CreateSolidColorBrush(D2D1::ColorF(theme::kText), white.GetAddressOf());
         d2dContext_->CreateSolidColorBrush(D2D1::ColorF(theme::kTextMuted), muted.GetAddressOf());
@@ -211,6 +213,7 @@ public:
         d2dContext_->CreateSolidColorBrush(D2D1::ColorF(theme::kHairline, theme::kHairlineA), softEdge.GetAddressOf());
         d2dContext_->CreateSolidColorBrush(D2D1::ColorF(theme::kSurface, theme::kSurfaceA), surfaceFill.GetAddressOf());
         d2dContext_->CreateSolidColorBrush(D2D1::ColorF(theme::kAccent, 0.14f), accentSoft.GetAddressOf());
+        d2dContext_->CreateSolidColorBrush(D2D1::ColorF(installedhighlight::CurrentColor()), installedHighlight.GetAddressOf());
 
         d2dContext_->BeginDraw();
         d2dContext_->Clear(D2D1::ColorF(theme::kBg));
@@ -671,7 +674,7 @@ public:
                         state.selectedModsTab != modstab::kProfiles;
                     const bool installedOff = state.modsCards[i].installedDisabled;
                     FillRound(card, panel.Get(), 14.0f);
-                    StrokeRound(card, (installedActive || installedOff) ? accent.Get() :
+                    StrokeRound(card, (installedActive || installedOff) ? installedHighlight.Get() :
                         (selected ? accent.Get() : softEdge.Get()), 14.0f,
                         selected ? 3.0f : (installedActive ? 2.5f : installedOff ? 2.0f : 1.0f));
 
@@ -705,7 +708,7 @@ public:
                         DrawText(state.modsCards[i].status.c_str(), smallMid_.Get(),
                             D2D1::RectF(textLeft, card.bottom - 40.0f, textRight, card.bottom - 6.0f),
                             (state.modsCards[i].installed || state.modsCards[i].installedDisabled)
-                                ? accent.Get() : muted.Get());
+                                ? installedHighlight.Get() : muted.Get());
                     }
                 }
             }
@@ -848,6 +851,27 @@ public:
                     curseForge ? black.Get() : white.Get());
 
                 RegisterHit(launchhit::kSettingsRowBase + 2, row);
+                rowY = row.bottom + 18.0f;
+            }
+
+            {
+                const D2D1_RECT_F row = D2D1::RectF(left, rowY, right, rowY + rowH);
+                const bool sel = state.settingsSelected == 3;
+                if (sel) GlowSelect(row, 12.0f);
+                FillRound(row, sel ? accentSoft.Get() : surfaceFill.Get(), 12.0f);
+                StrokeRound(row, sel ? accent.Get() : softEdge.Get(), 12.0f, sel ? 3.0f : 1.0f);
+                DrawText(L"Installed mod highlight color", bodyMid_.Get(),
+                    D2D1::RectF(row.left + 22.0f, row.top + 10.0f, right - 180.0f, row.top + 44.0f),
+                    sel ? accent.Get() : white.Get());
+                DrawText(L"A cycles colors; saves automatically", smallFormat_.Get(),
+                    D2D1::RectF(row.left + 22.0f, row.top + 44.0f, right - 180.0f, row.bottom - 8.0f),
+                    muted.Get());
+                ComPtr<ID2D1SolidColorBrush> swatch;
+                d2dContext_->CreateSolidColorBrush(D2D1::ColorF(installedhighlight::Color(state.settingsHighlightColor)), swatch.GetAddressOf());
+                const D2D1_RECT_F pill = D2D1::RectF(right - 175.0f, row.top + 20.0f, right - 22.0f, row.bottom - 20.0f);
+                FillRound(pill, swatch.Get(), 10.0f);
+                DrawText(installedhighlight::Name(state.settingsHighlightColor), smallMid_.Get(), pill, black.Get());
+                RegisterHit(launchhit::kSettingsRowBase + 3, row);
                 rowY = row.bottom + 18.0f;
             }
 
