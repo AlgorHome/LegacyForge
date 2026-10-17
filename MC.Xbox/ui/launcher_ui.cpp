@@ -871,22 +871,25 @@ static void EditLocalIdentityName(ICoreWindow* window, AuthScreenRenderer* rende
     }
 }
 
-MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authConfig, const std::wstring& runtimeRoot) {
+MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authConfig, const std::wstring& runtimeRoot,
+                            bool localSession, const std::wstring& localName) {
     AuthScreenRenderer rendererInstance;
     AuthScreenRenderer* renderer = nullptr;
     if (rendererInstance.Initialize(window)) {
         renderer = &rendererInstance;
     } else {
-        WriteLog(L"Main menu renderer failed; falling through to Play");
-        return MainMenuAction::Play;
+        WriteLog(L"Main menu renderer failed");
+        return localSession ? MainMenuAction::ReturnToSignIn : MainMenuAction::Play;
     }
 
     AuthUiState state;
     state.title = L"LegacyForge Launcher";
     state.showDeviceCode = false;
     state.showMainMenu = true;
-    state.homePlayerName = a2w(authConfig.username.c_str());
-    state.status = L"Signed in as " + state.homePlayerName;
+    state.isLocalSession = localSession;
+    state.homePlayerName = localSession ? localName : a2w(authConfig.username.c_str());
+    state.status = localSession ? L"Local launcher session - Minecraft Play unavailable" :
+        L"Signed in as " + state.homePlayerName;
     EnsureProfilesInitialized(runtimeRoot);
     auto refreshHomeSummary = [&]() {
         const std::wstring activeId = GetActiveProfileId(runtimeRoot);
@@ -1053,6 +1056,11 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
         const bool mouseClicked = mouse.TakeClick();
         if ((selectDown && !selectWasDown) || (mouseClicked && hovered >= 0)) {
             if (selected == 0) {
+                if (localSession) {
+                    state.detail = L"Sign in with Microsoft to verify Minecraft ownership.";
+                    selectWasDown = selectDown;
+                    continue;
+                }
                 WriteLog(L"Main menu: Play selected");
                 StopRemoteFileServer();
                 return MainMenuAction::Play;
@@ -1072,6 +1080,11 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                 WriteLog(L"Main menu: Settings selected");
                 ShowSettingsPage(window, renderer, state);
             } else if (selected == 5) {
+                if (localSession) {
+                    state.detail = L"Repair requires a Microsoft Minecraft session.";
+                    selectWasDown = selectDown;
+                    continue;
+                }
                 WriteLog(L"Main menu: Repair downloads selected");
                 StopRemoteFileServer();
                 state.status = L"Repairing downloaded files";
@@ -1082,11 +1095,11 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
             } else {
                 WriteLog(L"Main menu: Sign out selected");
                 StopRemoteFileServer();
-                state.status = L"Signing out";
-                state.detail = L"Clearing saved Microsoft session";
+                state.status = localSession ? L"Leaving local launcher" : L"Signing out";
+                state.detail = localSession ? L"Return to sign-in" : L"Clearing saved Microsoft session";
                 RenderAuth(renderer, state);
                 SleepWithAuthUi(renderer, state, 350);
-                return MainMenuAction::SignOut;
+                return localSession ? MainMenuAction::ReturnToSignIn : MainMenuAction::SignOut;
             }
         }
 
@@ -1097,7 +1110,8 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
     }
 }
 
-bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
+bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out, std::wstring& localName) {
+    localName.clear();
     AuthScreenRenderer rendererInstance;
     AuthScreenRenderer* renderer = nullptr;
     if (rendererInstance.Initialize(window)) {
@@ -1169,6 +1183,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
     bool localLeftWasDown = false;
     bool localRightWasDown = false;
     bool localRenameWasDown = false;
+    bool startWasDown = false;
     auto waitWithAccountOptions = [&](int milliseconds) {
         const auto start = std::chrono::steady_clock::now();
         while (std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -1185,6 +1200,17 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
                 OpenAccounts(state);
             }
             if (state.showAccounts) {
+                const bool start = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_GamepadMenu
+                });
+                if (start && !startWasDown && state.selectedAccountIndex == 1 &&
+                    state.localActive >= 0 &&
+                    state.localActive < static_cast<int>(state.localNames.size())) {
+                    localName = state.localNames[static_cast<size_t>(state.localActive)];
+                    state.showAccounts = false;
+                    return;
+                }
+                startWasDown = start;
                 const bool up = AnyVirtualKeyDown(window, {
                     ABI::Windows::System::VirtualKey_Up,
                     ABI::Windows::System::VirtualKey_GamepadDPadUp
@@ -1269,6 +1295,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
         state.status = L"Waiting for Microsoft sign-in";
         state.detail = L"Use the account that owns Minecraft Java Edition.";
         waitWithAccountOptions(interval * 1000);
+        if (!localName.empty()) return false;
 
         state.status = L"Checking sign-in";
         state.detail.clear();

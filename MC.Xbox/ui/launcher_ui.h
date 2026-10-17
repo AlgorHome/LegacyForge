@@ -17,7 +17,8 @@ class AuthScreenRenderer;
 enum class MainMenuAction {
     Play,
     RepairDownloads,
-    SignOut
+    SignOut,
+    ReturnToSignIn
 };
 
 bool CoreWindowAcceptsInput();
@@ -46,8 +47,11 @@ bool RunLaunchTaskWithLiveUi(
 MainMenuAction ShowMainMenu(
     ABI::Windows::UI::Core::ICoreWindow* window,
     const LaunchAuthConfig& authConfig,
-    const std::wstring& runtimeRoot);
+    const std::wstring& runtimeRoot,
+    bool localSession = false,
+    const std::wstring& localName = L"");
 
 bool ResolveLaunchAuthConfig(
     ABI::Windows::UI::Core::ICoreWindow* window,
-    LaunchAuthConfig& out);
+    LaunchAuthConfig& out,
+    std::wstring& localName);

@@ -267,6 +267,16 @@ std::vector<Scene> Scenes() {
         state.accountsMessage = L"Local launcher profiles are planned, not enabled yet.";
         return state;
     } });
+    scenes.push_back({ L"home-local-session", [] {
+        AuthUiState state = Screen();
+        state.showMainMenu = true;
+        state.isLocalSession = true;
+        state.homePlayerName = L"My Custom Profile";
+        state.homeProfileName = L"Survival";
+        state.homeTargetText = L"1.21.11 Fabric";
+        state.selectedMenuIndex = 0;
+        return state;
+    } });
     scenes.push_back({ L"home-no-profile", [] {
         AuthUiState state = Screen();
         state.showMainMenu = true;
