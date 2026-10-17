@@ -2208,6 +2208,8 @@ void ShowModsPage(
     bool xWasDown = false;
     bool yWasDown = false;
     bool wasOskVisible = false;
+    std::wstring pendingModRemoval;
+
     float lastMouseX = -100000.0f;
     float lastMouseY = -100000.0f;
 
@@ -2571,9 +2573,21 @@ void ShowModsPage(
                 else if (selRow >= state.modsProfileScroll + pmRows) state.modsProfileScroll = selRow - pmRows + 1;
             };
             const bool gridFocus = state.modsProfileFocus == 2;
+            // A pending deletion is tied to one exact JAR and one selection.
+            if (!pendingModRemoval.empty() &&
+                (!gridFocus || state.modsProfileSel < 0 || state.modsProfileSel >= pmTotal ||
+                 state.modsProfileMods[static_cast<size_t>(state.modsProfileSel)] != pendingModRemoval)) {
+                pendingModRemoval.clear();
+                state.status = L"Mod removal cancelled";
+            }
             if (backDown && !backWasDown) {
-                state.modsProfileOpen = false;
-                state.status.clear();
+                if (!pendingModRemoval.empty()) {
+                    pendingModRemoval.clear();
+                    state.status = L"Mod removal cancelled";
+                } else {
+                    state.modsProfileOpen = false;
+                    state.status.clear();
+                }
             } else if (yDown && !yWasDown && !state.modsProfileBuiltin) {
                 {
                     std::lock_guard<std::mutex> lk(g_modsSearchMutex);
@@ -2625,6 +2639,12 @@ void ShowModsPage(
             } else if (xDown && !xWasDown) {
                 if (gridFocus && pmTotal > 0 && state.modsProfileSel < pmTotal) {
                     const std::wstring jar = state.modsProfileMods[static_cast<size_t>(state.modsProfileSel)];
+                    if (pendingModRemoval != jar) {
+                        pendingModRemoval = jar;
+                        state.status = L"Press X again to remove " + jar +
+                            L" (and any unused dependencies). B cancels.";
+                    } else {
+                    pendingModRemoval.clear();
                     const int removed = RemoveProfileModAndUnusedDependencies(runtimeRoot, state.modsProfileId, jar);
                     state.modsProfileMods = ListProfileMods(runtimeRoot, state.modsProfileId);
                     const int newTotal = static_cast<int>(state.modsProfileMods.size());
@@ -2633,7 +2653,9 @@ void ShowModsPage(
                     pmEnsureVisible();
                     state.status = removed > 1
                         ? L"Removed " + jar + L" and " + std::to_wstring(removed - 1) + L" unused dependenc" + (removed == 2 ? L"y" : L"ies")
-                        : L"Removed " + jar;
+                        : (removed == 1 ? L"Removed " + jar : L"Could not remove " + jar);
+                    state.isError = removed == 0;
+                    }
                 } else if (!state.modsProfileBuiltin) {
                     const std::wstring gone = state.modsProfileName;
                     DeleteProfile(runtimeRoot, state.modsProfileId);
