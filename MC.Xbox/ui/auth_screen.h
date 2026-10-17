@@ -306,8 +306,12 @@ public:
                 DrawText(L"Back", smallFormat_.Get(),
                     D2D1::RectF(left + 30.0f, iconRect.bottom + 30.0f, left + 220.0f, iconRect.bottom + 30.0f + 28.0f), muted.Get());
 
-                if (!state.status.empty()) {
-                    DrawText(state.status.c_str(), smallFormat_.Get(),
+                // Modrinth/CurseForge target filtering is not evidence of Xbox
+                // UWP runtime compatibility. Show both as separate concepts.
+                const std::wstring compatibilityLine = state.status.empty()
+                    ? state.modsCompatContext : state.status;
+                if (!compatibilityLine.empty()) {
+                    DrawText(compatibilityLine.c_str(), smallFormat_.Get(),
                         D2D1::RectF(left, installBtn.bottom + 6.0f, right, installBtn.bottom + 32.0f),
                         state.isError ? danger.Get() : muted.Get());
                 }
