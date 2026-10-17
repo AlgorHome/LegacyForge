@@ -55,6 +55,7 @@ struct ModCard {
     std::wstring filePath;
     std::wstring status;
     bool installed = false;
+    bool installedDisabled = false;
     ContentKind kind = ContentKind::Mod;
     ModSource source = ModSource::Modrinth;
 };
