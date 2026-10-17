@@ -82,6 +82,8 @@ struct AuthUiState {
     int modsProfileScroll = 0;
     int modsProfileFocus = 0;
     int modsProfileSel = 0;
+    bool modsInspectOpen = false;
+    std::wstring modsInspectText;
     bool modsRenaming = false;
     std::wstring modsRenameText;
     std::vector<ModCard> modsCards;
