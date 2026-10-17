@@ -64,6 +64,7 @@ struct AuthUiState {
     bool modsCompatWarn = false;
     bool modsCompatAcked = false;
     std::wstring modsCompatNote;
+    std::wstring modsCompatContext;
     std::wstring activeProfileName;
     std::wstring activeProfileId;
     std::vector<LaunchTarget> modsTargets;

@@ -2925,6 +2925,9 @@ void ShowModsPage(
                     state.modsDetailLoading = true;
                     state.modsDetailReqId = StartDetailFetch(selected);
                     ApplyCompatFlag(state, selected);
+                    const LaunchTarget detailTarget = CurrentModsTarget(state);
+                    state.modsCompatContext = L"Browse target: " + TargetProfileText(detailTarget) +
+                        L"  |  Xbox UWP runtime: not verified";
                     state.status.clear();
                     state.isError = false;
                 }
