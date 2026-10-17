@@ -396,10 +396,14 @@ static int RemoveProfileModAndUnusedDependencies(const std::wstring& runtimeRoot
     ProfileModInstallMeta removedMeta;
     const bool hasMeta = ReadProfileModInstallMetaFromModsDir(modsDir, metadataName, removedMeta);
 
-    int removed = 0;
-    if (DeleteFileW((modsDir + L"\\" + jarName).c_str())) {
-        ++removed;
+    // Only update metadata or dependent files after the selected JAR was
+    // actually removed. A failed DeleteFileW must leave the installation intact.
+    if (!DeleteFileW((modsDir + L"\\" + jarName).c_str())) {
+        WriteLogF(L"Mod removal failed; leaving metadata and dependencies untouched: %s (error %u)",
+            jarName.c_str(), GetLastError());
+        return 0;
     }
+    int removed = 1;
     DeleteFileW(ModMetaPath(runtimeRoot, metadataName).c_str());
     DeleteFileW(ProfileModInstallMetaPathFromModsDir(modsDir, metadataName).c_str());
 
