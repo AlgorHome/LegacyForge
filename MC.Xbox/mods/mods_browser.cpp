@@ -334,6 +334,29 @@ static std::wstring ProfileModMetadataName(const std::wstring& name) {
     return IsDisabledProfileMod(name) ? name.substr(0, name.size() - 9) : name;
 }
 
+static std::vector<std::wstring> EnabledDependentsForProfileMod(
+    const std::wstring& runtimeRoot, const std::wstring& profileId,
+    const std::wstring& fileName) {
+    const std::wstring modsDir = ProfileModsDir(runtimeRoot, profileId);
+    ProfileModInstallMeta target;
+    if (!ReadProfileModInstallMetaFromModsDir(modsDir, ProfileModMetadataName(fileName), target) ||
+        target.projectId.empty()) return {};
+    std::vector<std::wstring> dependents;
+    for (const std::wstring& other : ListProfileMods(runtimeRoot, profileId)) {
+        if (other == fileName || IsDisabledProfileMod(other)) continue;
+        ProfileModInstallMeta meta;
+        if (!ReadProfileModInstallMetaFromModsDir(modsDir, ProfileModMetadataName(other), meta) ||
+            meta.projectId.empty()) continue;
+        for (const std::wstring& parentId : target.requiredBy) {
+            if (ToLowerW(parentId) == ToLowerW(meta.projectId)) {
+                dependents.push_back(meta.title.empty() ? other : meta.title);
+                break;
+            }
+        }
+    }
+    return dependents;
+}
+
 static bool ToggleProfileMod(const std::wstring& runtimeRoot,
                              const std::wstring& profileId,
                              const std::wstring& name,
@@ -2233,6 +2256,7 @@ void ShowModsPage(
     bool yWasDown = false;
     bool wasOskVisible = false;
     std::wstring pendingModRemoval;
+    std::wstring pendingModDisable;
 
     float lastMouseX = -100000.0f;
     float lastMouseY = -100000.0f;
@@ -2604,8 +2628,17 @@ void ShowModsPage(
                 pendingModRemoval.clear();
                 state.status = L"Mod removal cancelled";
             }
+            if (!pendingModDisable.empty() &&
+                (!gridFocus || state.modsProfileSel < 0 || state.modsProfileSel >= pmTotal ||
+                 state.modsProfileMods[static_cast<size_t>(state.modsProfileSel)] != pendingModDisable)) {
+                pendingModDisable.clear();
+                state.status = L"Mod disable cancelled";
+            }
             if (backDown && !backWasDown) {
-                if (!pendingModRemoval.empty()) {
+                if (!pendingModDisable.empty()) {
+                    pendingModDisable.clear();
+                    state.status = L"Mod disable cancelled";
+                } else if (!pendingModRemoval.empty()) {
                     pendingModRemoval.clear();
                     state.status = L"Mod removal cancelled";
                 } else {
@@ -2661,6 +2694,7 @@ void ShowModsPage(
             } else if (gridFocus && (pageUpDown && !pageUpWasDown)) {
                 state.modsProfileSel = (std::max)(0, state.modsProfileSel - pmRows * 2); pmEnsureVisible();
             } else if (xDown && !xWasDown) {
+                pendingModDisable.clear();
                 if (gridFocus && pmTotal > 0 && state.modsProfileSel < pmTotal) {
                     const std::wstring jar = state.modsProfileMods[static_cast<size_t>(state.modsProfileSel)];
                     if (pendingModRemoval != jar) {
@@ -2691,6 +2725,18 @@ void ShowModsPage(
                 if (gridFocus && pmTotal > 0 && state.modsProfileSel >= 0 &&
                     state.modsProfileSel < pmTotal) {
                     const std::wstring oldName = state.modsProfileMods[static_cast<size_t>(state.modsProfileSel)];
+                    const std::vector<std::wstring> dependents = IsDisabledProfileMod(oldName)
+                        ? std::vector<std::wstring>()
+                        : EnabledDependentsForProfileMod(runtimeRoot, state.modsProfileId, oldName);
+                    if (!dependents.empty() && pendingModDisable != oldName) {
+                        pendingModDisable = oldName;
+                        pendingModRemoval.clear();
+                        state.status = L"Required by " + std::to_wstring(dependents.size()) +
+                            L" enabled mod(s), e.g. " + dependents.front() +
+                            L". Press A again to disable; B cancels.";
+                        state.isError = false;
+                    } else {
+                    pendingModDisable.clear();
                     std::wstring newName;
                     if (ToggleProfileMod(runtimeRoot, state.modsProfileId, oldName, newName)) {
                         pendingModRemoval.clear();
@@ -2709,6 +2755,7 @@ void ShowModsPage(
                     } else {
                         state.status = L"Could not toggle mod " + oldName;
                         state.isError = true;
+                    }
                     }
                 } else if (state.modsProfileFocus == 1 && !state.modsProfileBuiltin) {
                     const std::wstring gone = state.modsProfileName;
