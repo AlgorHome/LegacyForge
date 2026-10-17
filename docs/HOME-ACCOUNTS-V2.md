@@ -118,3 +118,9 @@ This is a deliberately bounded first step: custom name entry via Xbox on-screen 
 - [ ] Y then B cancels deletion; Y then A deletes; restart confirms persistence.
 - [ ] The Microsoft flow, B navigation, and other account information still work.
 - [ ] No unauthenticated Minecraft Play action becomes available.
+
+## Phase 4C: Xbox keyboard name editor (feature branch; requires compilation)
+
+The local Accounts option now supports name entry on Xbox using UWP CoreTextEditContext and InputPane, following the existing Mods keyboard implementation. Local Profile: X opens a new identity editor, A opens it when the list is empty, RB/F2 renames the selected entry, Y retains delete confirmation. A or Enter saves once the editor is ready, B cancels. Names are trimmed, limited to 1–24 characters (letters, digits, space, underscore, dash), and must be unique ignoring case. Existing saved Local 1/Local 2 identities and active selection are loaded from the same LocalState file. The feature does not enable unauthenticated Minecraft gameplay.
+
+Xbox tests: create and rename custom names using the on-screen keyboard; check duplicates, blank names, keyboard cancel, restart persistence, delete controls, and Microsoft login regression.

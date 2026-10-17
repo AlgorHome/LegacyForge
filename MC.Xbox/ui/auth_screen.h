@@ -996,7 +996,7 @@ public:
                 L"Custom Skin Service (Ely.by)", L"Get Minecraft", L"Account Help"
             };
             const wchar_t* hints[] = {
-                L"Default  /  device-code sign-in", L"Local identity  /  A select, X new",
+                L"Default  /  device-code sign-in", L"Local identity  /  X new, RB rename",
                 L"Optional service  /  coming later", L"Official information",
                 L"Sign-in and ownership guidance"
             };
@@ -1022,6 +1022,34 @@ public:
             DrawText(state.accountsMessage.c_str(), captionFormat_.Get(),
                 D2D1::RectF(methods.left + 20.0f, methods.bottom - 43.0f,
                     methods.right - 16.0f, methods.bottom - 9.0f), accent.Get());
+            if (state.localNameEditing) {
+                const D2D1_RECT_F editorPanel = D2D1::RectF(
+                    frame.left + 240.0f, frame.top + 265.0f,
+                    frame.right - 240.0f, frame.top + 550.0f);
+                FillRound(editorPanel, panel.Get(), 18.0f);
+                StrokeRound(editorPanel, accent.Get(), 18.0f, 3.0f);
+                DrawText(state.localNameRenaming ? L"RENAME LOCAL IDENTITY" : L"CREATE LOCAL IDENTITY",
+                    cardTitleFormat_.Get(),
+                    D2D1::RectF(editorPanel.left + 25.0f, editorPanel.top + 22.0f,
+                        editorPanel.right - 25.0f, editorPanel.top + 62.0f), white.Get());
+                const D2D1_RECT_F field = D2D1::RectF(
+                    editorPanel.left + 25.0f, editorPanel.top + 82.0f,
+                    editorPanel.right - 25.0f, editorPanel.top + 156.0f);
+                FillRound(field, accentSoft.Get(), 10.0f);
+                StrokeRound(field, accent.Get(), 10.0f, 2.0f);
+                const std::wstring shownName = state.localNameDraft.empty()
+                    ? std::wstring(L"Enter a name...") : state.localNameDraft;
+                DrawText(shownName.c_str(), bodyMid_.Get(), field,
+                    state.localNameDraft.empty() ? muted.Get() : white.Get());
+                DrawText(L"1-24 characters: letters, digits, space, _ or -",
+                    captionFormat_.Get(),
+                    D2D1::RectF(editorPanel.left + 25.0f, editorPanel.top + 166.0f,
+                        editorPanel.right - 25.0f, editorPanel.top + 198.0f), muted.Get());
+                DrawText(L"Enter / A  Save  |  B  Cancel",
+                    captionFormat_.Get(),
+                    D2D1::RectF(editorPanel.left + 25.0f, editorPanel.bottom - 54.0f,
+                        editorPanel.right - 25.0f, editorPanel.bottom - 14.0f), accent.Get());
+            }
             finishDraw();
             return;
         }
