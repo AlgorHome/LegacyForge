@@ -2526,10 +2526,22 @@ void ShowModsPage(
             ModsSearchEndInput();
             state.modsRenaming = false;
             if (!buf.empty() && !state.modsProfileBuiltin) {
-                RenameProfile(runtimeRoot, state.modsProfileId, buf);
-                state.modsProfileName = buf;
-                if (state.activeProfileId == state.modsProfileId) state.activeProfileName = buf;
-                state.status = L"Renamed to " + buf;
+                const std::wstring renamedId = state.modsProfileId;
+                RenameProfile(runtimeRoot, renamedId, buf);
+                // Refresh the backing profile cards immediately. Keep the detail
+                // modal on the same stable profile ID, not a stale list index.
+                LoadModsTab(state, runtimeRoot);
+                for (int i = 0; i < static_cast<int>(state.modsCards.size()); ++i) {
+                    const ModCard& card = state.modsCards[static_cast<size_t>(i)];
+                    if (card.projectId == L"__profile__" && card.filePath == renamedId) {
+                        state.selectedModIndex = i;
+                        break;
+                    }
+                }
+                state.modsProfileName = ProfileDisplayName(runtimeRoot, renamedId);
+                if (state.activeProfileId == renamedId) state.activeProfileName = state.modsProfileName;
+                state.status = L"Renamed to " + state.modsProfileName;
+                state.isError = false;
             }
         }
         wasOskVisible = oskVisible;
@@ -3190,8 +3202,17 @@ void ShowModsPage(
                         SetActiveProfileId(runtimeRoot, pid);
                         state.modsBrowseTargetId = target.targetId;
                         LoadModsTab(state, runtimeRoot);
+                        // The "New profile" tile changes position after insertion.
+                        // Select the new stable ID, rather than the previous index.
+                        for (int i = 0; i < static_cast<int>(state.modsCards.size()); ++i) {
+                            const ModCard& card = state.modsCards[static_cast<size_t>(i)];
+                            if (card.projectId == L"__profile__" && card.filePath == pid) {
+                                state.selectedModIndex = i;
+                                break;
+                            }
+                        }
                         ensureSelectionVisible();
-                        state.status = L"New profile ready. Browse mods to fill it.";
+                        state.status = L"New profile ready. A inspect, then Y rename.";
                     } else if (selected.projectId == L"__profile__") {
                         SetModsTargetFromProfile(state, runtimeRoot, selected.filePath);
                         state.modsProfileOpen = true;
