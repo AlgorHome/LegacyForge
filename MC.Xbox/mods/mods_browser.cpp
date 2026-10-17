@@ -397,6 +397,33 @@ static std::wstring InspectProfileMod(const std::wstring& root,
     return body;
 }
 
+// Only recorded project IDs qualify for an installed indicator. Filename/title
+// matches are deliberately not trusted as evidence of installation.
+static void MarkInstalledBrowseCards(std::vector<ModCard>& cards,
+                                     const std::wstring& runtimeRoot,
+                                     const std::wstring& profileId) {
+    struct InstalledState { bool enabled = false; bool disabled = false; };
+    std::map<std::wstring, InstalledState> index;
+    const std::wstring modsDir = ProfileModsDir(runtimeRoot, profileId);
+    for (const std::wstring& file : ListProfileMods(runtimeRoot, profileId)) {
+        ProfileModInstallMeta meta;
+        if (!ReadProfileModInstallMetaFromModsDir(modsDir, ProfileModMetadataName(file), meta) ||
+            meta.projectId.empty()) continue;
+        InstalledState& state = index[ToLowerW(meta.projectId)];
+        if (IsDisabledProfileMod(file)) state.disabled = true;
+        else state.enabled = true;
+    }
+    for (ModCard& card : cards) {
+        if (card.projectId.empty() || card.projectId.rfind(L"__", 0) == 0) continue;
+        const auto it = index.find(ToLowerW(card.projectId));
+        if (it == index.end()) continue;
+        card.installed = it->second.enabled;
+        card.installedDisabled = !it->second.enabled && it->second.disabled;
+        if (card.installed) card.status = L"Installed in active profile";
+        else if (card.installedDisabled) card.status = L"Installed - disabled";
+    }
+}
+
 static bool ToggleProfileMod(const std::wstring& runtimeRoot,
                              const std::wstring& profileId,
                              const std::wstring& name,
@@ -1993,6 +2020,7 @@ static void LoadModsTab(AuthUiState& state, const std::wstring& runtimeRoot) {
                 }
             }
         }
+        MarkInstalledBrowseCards(state.modsCards, runtimeRoot, state.activeProfileId);
         QueueModIcons(state.modsCards);
         state.status = state.modsCards.empty()
             ? L"No recommended mods"
@@ -2013,6 +2041,7 @@ static void LoadModsTab(AuthUiState& state, const std::wstring& runtimeRoot) {
 
     state.modsTotalHits = total;
     state.modsExhausted = static_cast<int>(state.modsCards.size()) >= total;
+    MarkInstalledBrowseCards(state.modsCards, runtimeRoot, state.activeProfileId);
     QueueModIcons(state.modsCards);
     state.status = state.modsCards.empty()
         ? std::wstring(L"No ") + ContentNoun(tab.kind, true) + L" found"
@@ -2370,6 +2399,7 @@ void ShowModsPage(
         const int after = static_cast<int>(state.modsCards.size());
         state.modsTotalHits = total;
         state.modsExhausted = after == before || after >= total;
+        MarkInstalledBrowseCards(state.modsCards, runtimeRoot, GetActiveProfileId(runtimeRoot));
         QueueModIconsAppend(state.modsCards, static_cast<size_t>(before));
         state.status = std::to_wstring(after) + L" of " + std::to_wstring(total);
     };

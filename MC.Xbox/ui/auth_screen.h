@@ -667,8 +667,13 @@ public:
                     const bool selected = state.modsFocus == 2 && i == state.selectedModIndex;
 
                     if (selected) GlowSelect(card, 14.0f);
+                    const bool installedActive = state.modsCards[i].installed &&
+                        state.selectedModsTab != modstab::kProfiles;
+                    const bool installedOff = state.modsCards[i].installedDisabled;
                     FillRound(card, panel.Get(), 14.0f);
-                    StrokeRound(card, selected ? accent.Get() : softEdge.Get(), 14.0f, selected ? 3.0f : 1.0f);
+                    StrokeRound(card, (installedActive || installedOff) ? accent.Get() :
+                        (selected ? accent.Get() : softEdge.Get()), 14.0f,
+                        selected ? 3.0f : (installedActive ? 2.5f : installedOff ? 2.0f : 1.0f));
 
                     const float imageSide = (std::min)(cardH - 24.0f, 112.0f);
                     const float imageTop = card.top + (cardH - imageSide) * 0.5f;
@@ -699,7 +704,8 @@ public:
                     if (!state.modsCards[i].status.empty()) {
                         DrawText(state.modsCards[i].status.c_str(), smallMid_.Get(),
                             D2D1::RectF(textLeft, card.bottom - 40.0f, textRight, card.bottom - 6.0f),
-                            state.modsCards[i].installed ? accent.Get() : muted.Get());
+                            (state.modsCards[i].installed || state.modsCards[i].installedDisabled)
+                                ? accent.Get() : muted.Get());
                     }
                 }
             }
