@@ -1376,7 +1376,64 @@ static std::wstring CleanMarkdown(const std::wstring& in,
     return out;
 }
 
-static void FetchProjectDetail(const std::wstring& idOrSlug, std::wstring& body, std::wstring& meta, std::vector<std::pair<UINT32, UINT32>>& bold, std::vector<std::pair<UINT32, UINT32>>& head) {
+
+static std::wstring FetchModrinthDependencySummary(const std::wstring& idOrSlug,
+                                                    const LaunchTarget& target) {
+    using namespace winrt::Windows::Data::Json;
+    if (idOrSlug.empty() || target.minecraftVersion.empty()) return L"\n\nDEPENDENCIES\nTarget information unavailable.";
+    const std::string gameVersions = "[\"" + w2a(target.minecraftVersion) + "\"]";
+    const std::string loader = ModrinthLoaderId(target.loader);
+    std::wstring url = L"https://api.modrinth.com/v2/project/" +
+        a2w(FormUrlEncode(w2a(idOrSlug)).c_str()) + L"/version?game_versions=" +
+        a2w(FormUrlEncode(gameVersions).c_str()) + L"&include_changelog=false";
+    if (!loader.empty())
+        url += L"&loaders=" + a2w(FormUrlEncode("[\"" + loader + "\"]").c_str());
+
+    const HttpResult response = HttpGetString(url.c_str());
+    if (!response.success()) return L"\n\nDEPENDENCIES\nCould not retrieve dependency metadata.";
+    try {
+        JsonArray versions = JsonArray::Parse(winrt::to_hstring(response.body));
+        if (!versions.Size())
+            return L"\n\nDEPENDENCIES\nNo matching version for this Minecraft target; dependencies cannot be determined.";
+        // Same release-first ordering used by the Modrinth installer, which
+        // chooses the first compatible candidate and falls back to prereleases.
+        JsonObject chosen{nullptr};
+        for (uint32_t i = 0; i < versions.Size(); ++i) {
+            if (versions.GetAt(i).ValueType() != JsonValueType::Object) continue;
+            JsonObject candidate = versions.GetAt(i).GetObject();
+            if (!chosen || JsonStringOrEmpty(candidate, L"version_type") == L"release") {
+                chosen = candidate;
+                if (JsonStringOrEmpty(candidate, L"version_type") == L"release") break;
+            }
+        }
+        if (!chosen) return L"\n\nDEPENDENCIES\nMatching version metadata was incomplete.";
+        std::wstring summary = L"\n\nREQUIRED DEPENDENCIES (MODRINTH)\n";
+        int required = 0;
+        if (chosen.HasKey(L"dependencies") &&
+            chosen.GetNamedValue(L"dependencies").ValueType() == JsonValueType::Array) {
+            JsonArray dependencies = chosen.GetNamedArray(L"dependencies");
+            for (uint32_t i = 0; i < dependencies.Size(); ++i) {
+                if (dependencies.GetAt(i).ValueType() != JsonValueType::Object) continue;
+                JsonObject dep = dependencies.GetAt(i).GetObject();
+                if (JsonStringOrEmpty(dep, L"dependency_type") != L"required") continue;
+                ++required;
+                if (required > 8) continue;
+                const std::wstring project = JsonStringOrEmpty(dep, L"project_id");
+                const std::wstring version = JsonStringOrEmpty(dep, L"version_id");
+                summary += L"- " + (!project.empty() ? project :
+                    (!version.empty() ? (L"Version " + version) : L"Unnamed required dependency")) + L"\n";
+            }
+        }
+        if (!required) summary += L"No required dependencies declared for this release.\n";
+        if (required > 8) summary += L"... and " + std::to_wstring(required - 8) + L" more.\n";
+        summary += L"Installed/missing status not verified. Some mods require extra libraries not listed by the API.";
+        return summary;
+    } catch (const winrt::hresult_error&) {
+        return L"\n\nDEPENDENCIES\nCould not parse dependency metadata.";
+    }
+}
+
+static void FetchProjectDetail(const std::wstring& idOrSlug, const LaunchTarget& target, std::wstring& body, std::wstring& meta, std::vector<std::pair<UINT32, UINT32>>& bold, std::vector<std::pair<UINT32, UINT32>>& head) {
     using namespace winrt::Windows::Data::Json;
     const std::wstring url = L"https://api.modrinth.com/v2/project/" + a2w(FormUrlEncode(w2a(idOrSlug)).c_str());
     const HttpResult response = HttpGetString(url.c_str());
@@ -1414,18 +1471,19 @@ static std::wstring g_detailBody;
 static std::wstring g_detailMeta;
 static std::vector<std::pair<UINT32, UINT32>> g_detailBold;
 static std::vector<std::pair<UINT32, UINT32>> g_detailHead;
-static unsigned StartDetailFetch(const ModCard& card) {
+static unsigned StartDetailFetch(const ModCard& card, const LaunchTarget& target) {
     const unsigned id = ++g_detailReqId;
     const std::wstring idOrSlug = !card.projectId.empty() ? card.projectId : card.slug;
     const ModSource source = card.source;
     g_detailFetching.store(true);
-    std::thread([id, idOrSlug, source]() {
+    std::thread([id, idOrSlug, source, target]() {
         std::wstring body, meta;
         std::vector<std::pair<UINT32, UINT32>> bold, head;
         if (source == ModSource::CurseForge) {
             curseforge::FetchDetail(idOrSlug, body, meta, bold, head);
         } else {
-            FetchProjectDetail(idOrSlug, body, meta, bold, head);
+            FetchProjectDetail(idOrSlug, target, body, meta, bold, head);
+            body += FetchModrinthDependencySummary(idOrSlug, target);
         }
         std::lock_guard<std::mutex> lk(g_detailMutex);
         if (id == g_detailReqId.load()) {
@@ -2923,7 +2981,7 @@ void ShowModsPage(
                     state.modsDetailHead.clear();
                     state.modsDetailMeta.clear();
                     state.modsDetailLoading = true;
-                    state.modsDetailReqId = StartDetailFetch(selected);
+                    state.modsDetailReqId = StartDetailFetch(selected, CurrentModsTarget(state));
                     ApplyCompatFlag(state, selected);
                     const LaunchTarget detailTarget = CurrentModsTarget(state);
                     state.modsCompatContext = L"Browse target: " + TargetProfileText(detailTarget) +
