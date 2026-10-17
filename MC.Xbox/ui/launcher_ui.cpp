@@ -900,6 +900,17 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
         state.homeModCount = ProfileModCount(runtimeRoot, activeId);
     };
     refreshHomeSummary();
+    // The selected offline identity can change while Accounts is open. Home's
+    // display name must follow that selection without restarting the launcher.
+    // This is presentation metadata only and never changes Microsoft auth.
+    auto syncLocalHomeIdentity = [&]() {
+        if (!localSession) return;
+        if (state.localActive >= 0 &&
+            state.localActive < static_cast<int>(state.localNames.size()))
+            state.homePlayerName = state.localNames[static_cast<size_t>(state.localActive)];
+        else
+            state.homePlayerName = L"Local Launcher";
+    };
 
     int selected = 0;
     bool upWasDown = false;
@@ -1002,6 +1013,9 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                     break;
                 }
             }
+            // Covers newly created, renamed, selected and deleted identities.
+            // Do not confuse cursor movement with an actual active selection.
+            syncLocalHomeIdentity();
             if (goBack && !accountBackWasDown) {
                 if (state.localDeletePending) {
                     state.localDeletePending = false;
@@ -1073,6 +1087,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                 WriteLog(L"Main menu: Accounts selected");
                 state.showMainMenu = false;
                 OpenAccounts(state);
+                syncLocalHomeIdentity();
             } else if (selected == 3) {
                 WriteLog(L"Main menu: Remote files selected");
                 ShowRemoteFilesPage(window, renderer, state, runtimeRoot);
