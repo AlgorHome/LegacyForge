@@ -12,6 +12,7 @@
 #include "remote_file_server.h"
 #include "telemetry.h"
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -548,6 +549,92 @@ static void ShowSettingsPage(ICoreWindow* window, AuthScreenRenderer* renderer, 
     WriteLog(L"Settings page closed");
 }
 
+
+// Offline launcher identities are UI metadata only, never Minecraft credentials.
+static std::wstring LocalIdsFile() {
+    return GetLocalStateDir() + L"\\accounts\\local_ids.txt";
+}
+static void LoadLocalIds(AuthUiState& s) {
+    s.localNames.clear();
+    s.localActive = -1;
+    s.localCursor = -1;
+    std::wstring raw;
+    if (!ReadTextFile(LocalIdsFile(), raw) || raw.size() > 2048) return;
+    size_t pos = raw.find(L'\n');
+    if (pos == std::wstring::npos) return;
+    const std::wstring active = TrimWhitespace(raw.substr(0, pos));
+    ++pos;
+    while (pos < raw.size() && s.localNames.size() < 12) {
+        size_t end = raw.find(L'\n', pos);
+        std::wstring name = TrimWhitespace(raw.substr(pos, end == std::wstring::npos ? std::wstring::npos : end - pos));
+        if (!name.empty() && name.size() <= 24 &&
+            name.find_first_of(L"\\/:*?\"<>|\r\t") == std::wstring::npos &&
+            std::find(s.localNames.begin(), s.localNames.end(), name) == s.localNames.end())
+            s.localNames.push_back(name);
+        if (end == std::wstring::npos) break;
+        pos = end + 1;
+    }
+    for (int i = 0; i < static_cast<int>(s.localNames.size()); ++i)
+        if (s.localNames[i] == active) s.localActive = i;
+    s.localCursor = s.localActive >= 0 ? s.localActive : (s.localNames.empty() ? -1 : 0);
+}
+static bool SaveLocalIds(const AuthUiState& s) {
+    if (!EnsureDirectoryTree(GetLocalStateDir() + L"\\accounts")) return false;
+    std::wstring body = (s.localActive >= 0 && s.localActive < static_cast<int>(s.localNames.size()))
+        ? s.localNames[s.localActive] : L"";
+    body += L"\n";
+    for (const auto& n : s.localNames) body += n + L"\n";
+    return WriteTextFile(LocalIdsFile(), body);
+}
+static void LocalIdAction(AuthUiState& s, int kind) {
+    // 0 select/create, 1 new, 2 previous, 3 next, 4 ask delete.
+    const int count = static_cast<int>(s.localNames.size());
+    if (kind == 1 || (kind == 0 && count == 0)) {
+        if (count >= 12) { s.accountsMessage = L"Maximum 12 local identities."; return; }
+        int n = 1;
+        std::wstring name;
+        do { name = L"Local " + std::to_wstring(n++); }
+        while (std::find(s.localNames.begin(), s.localNames.end(), name) != s.localNames.end());
+        s.localNames.push_back(name);
+        s.localCursor = static_cast<int>(s.localNames.size()) - 1;
+        s.localActive = s.localCursor;
+        s.localDeletePending = false;
+        s.accountsMessage = SaveLocalIds(s) ? L"Local identity saved (launcher only)." : L"Could not save identity.";
+        return;
+    }
+    if (count == 0) { s.accountsMessage = L"Press A to create a local identity."; return; }
+    if (s.localCursor < 0 || s.localCursor >= count) s.localCursor = 0;
+    if (kind == 2 || kind == 3) {
+        s.localCursor = (s.localCursor + count + (kind == 2 ? -1 : 1)) % count;
+        s.localDeletePending = false;
+        s.accountsMessage = L"A Select  |  X New  |  Y Delete";
+        return;
+    }
+    if (kind == 4) {
+        s.localDeletePending = true;
+        s.accountsMessage = L"Delete selected local identity? A Confirm / B Cancel";
+        return;
+    }
+    if (s.localDeletePending) {
+        const int old = s.localCursor;
+        s.localNames.erase(s.localNames.begin() + old);
+        s.localActive = s.localActive == old ? -1 : (s.localActive > old ? s.localActive - 1 : s.localActive);
+        s.localCursor = s.localNames.empty() ? -1 : (std::min)(old, static_cast<int>(s.localNames.size()) - 1);
+        s.localDeletePending = false;
+        s.accountsMessage = SaveLocalIds(s) ? L"Local identity deleted." : L"Could not save deletion.";
+        return;
+    }
+    s.localActive = s.localCursor;
+    s.accountsMessage = SaveLocalIds(s) ? L"Local identity selected. Minecraft is not unlocked." : L"Could not save selection.";
+}
+static void OpenAccounts(AuthUiState& s) {
+    s.showAccounts = true;
+    s.selectedAccountIndex = 0;
+    s.localDeletePending = false;
+    LoadLocalIds(s);
+    s.accountsMessage = L"A Select  |  Local: X New / Y Delete  |  B Back";
+}
+
 MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authConfig, const std::wstring& runtimeRoot) {
     AuthScreenRenderer rendererInstance;
     AuthScreenRenderer* renderer = nullptr;
@@ -580,6 +667,10 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
     bool downWasDown = false;
     bool selectWasDown = false;
     bool accountBackWasDown = false;
+    bool localXWasDown = false;
+    bool localYWasDown = false;
+    bool localLeftWasDown = false;
+    bool localRightWasDown = false;
 
     ShowCrashScreen(window, renderer, state);
 
@@ -625,13 +716,32 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
             if (goDown && !downWasDown) {
                 state.selectedAccountIndex = (state.selectedAccountIndex + 1) % 5;
             }
+            const bool localX = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_GamepadX
+            });
+            const bool localY = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_GamepadY
+            });
+            const bool localLeft = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Left,
+                ABI::Windows::System::VirtualKey_GamepadDPadLeft
+            });
+            const bool localRight = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Right,
+                ABI::Windows::System::VirtualKey_GamepadDPadRight
+            });
+            if (state.selectedAccountIndex == 1) {
+                if (localX && !localXWasDown) LocalIdAction(state, 1);
+                if (localY && !localYWasDown) LocalIdAction(state, 4);
+                if (localLeft && !localLeftWasDown) LocalIdAction(state, 2);
+                if (localRight && !localRightWasDown) LocalIdAction(state, 3);
+            }
             if (goSelect && !selectWasDown) {
-                switch (state.selectedAccountIndex) {
+                if (state.selectedAccountIndex == 1) {
+                    LocalIdAction(state, 0);
+                } else switch (state.selectedAccountIndex) {
                 case 0:
                     state.accountsMessage = L"Microsoft account connected. Use Sign out on Home to switch.";
-                    break;
-                case 1:
-                    state.accountsMessage = L"Local launcher profiles are planned, not enabled yet.";
                     break;
                 case 2:
                     state.accountsMessage = L"Ely.by integration is not implemented yet.";
@@ -645,9 +755,18 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                 }
             }
             if (goBack && !accountBackWasDown) {
-                state.showAccounts = false;
-                state.showMainMenu = true;
+                if (state.localDeletePending) {
+                    state.localDeletePending = false;
+                    state.accountsMessage = L"Delete cancelled.";
+                } else {
+                    state.showAccounts = false;
+                    state.showMainMenu = true;
+                }
             }
+            localXWasDown = localX;
+            localYWasDown = localY;
+            localLeftWasDown = localLeft;
+            localRightWasDown = localRight;
             upWasDown = goUp;
             downWasDown = goDown;
             selectWasDown = goSelect;
@@ -699,9 +818,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
             } else if (selected == 2) {
                 WriteLog(L"Main menu: Accounts selected");
                 state.showMainMenu = false;
-                state.showAccounts = true;
-                state.selectedAccountIndex = 0;
-                state.accountsMessage = L"A  Select an option  |  B  Back";
+                OpenAccounts(state);
             } else if (selected == 3) {
                 WriteLog(L"Main menu: Remote files selected");
                 ShowRemoteFilesPage(window, renderer, state, runtimeRoot);
@@ -796,6 +913,98 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
     state.secondsRemaining = device.expiresIn;
     RenderAuth(renderer, state);
 
+    // Allow controller-only browsing of account options during device-code polling.
+    bool xWasDown = false;
+    bool bWasDown = false;
+    bool upWasDown = false;
+    bool downWasDown = false;
+    bool selectWasDown = false;
+    bool localYWasDown = false;
+    bool localLeftWasDown = false;
+    bool localRightWasDown = false;
+    auto waitWithAccountOptions = [&](int milliseconds) {
+        const auto start = std::chrono::steady_clock::now();
+        while (std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now() - start).count() < milliseconds) {
+            const bool x = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_X,
+                ABI::Windows::System::VirtualKey_GamepadX
+            });
+            const bool back = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Escape,
+                ABI::Windows::System::VirtualKey_GamepadB
+            });
+            if (x && !xWasDown && !state.showAccounts) {
+                OpenAccounts(state);
+            }
+            if (state.showAccounts) {
+                const bool up = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Up,
+                    ABI::Windows::System::VirtualKey_GamepadDPadUp
+                });
+                const bool down = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Down,
+                    ABI::Windows::System::VirtualKey_GamepadDPadDown
+                });
+                const bool select = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Enter,
+                    ABI::Windows::System::VirtualKey_GamepadA
+                });
+                if (up && !upWasDown) state.selectedAccountIndex = (state.selectedAccountIndex + 4) % 5;
+                if (down && !downWasDown) state.selectedAccountIndex = (state.selectedAccountIndex + 1) % 5;
+                const bool left = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Left,
+                    ABI::Windows::System::VirtualKey_GamepadDPadLeft
+                });
+                const bool right = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Right,
+                    ABI::Windows::System::VirtualKey_GamepadDPadRight
+                });
+                const bool y = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_GamepadY
+                });
+                if (state.selectedAccountIndex == 1) {
+                    if (x && !xWasDown) LocalIdAction(state, 1);
+                    if (y && !localYWasDown) LocalIdAction(state, 4);
+                    if (left && !localLeftWasDown) LocalIdAction(state, 2);
+                    if (right && !localRightWasDown) LocalIdAction(state, 3);
+                }
+                if (select && !selectWasDown) {
+                    if (state.selectedAccountIndex == 1) {
+                        LocalIdAction(state, 0);
+                    } else switch (state.selectedAccountIndex) {
+                    case 0: state.accountsMessage = L"Press B to return to Microsoft sign-in."; break;
+                    case 2: state.accountsMessage = L"Ely.by integration is coming later."; break;
+                    case 3: state.accountsMessage = L"Minecraft Java information: minecraft.net"; break;
+                    default: state.accountsMessage = L"Microsoft verifies Java Edition ownership."; break;
+                    }
+                }
+                upWasDown = up;
+                downWasDown = down;
+                selectWasDown = select;
+                localLeftWasDown = left;
+                localRightWasDown = right;
+                localYWasDown = y;
+                if (back && !bWasDown) {
+                    if (state.localDeletePending) {
+                        state.localDeletePending = false;
+                        state.accountsMessage = L"Delete cancelled.";
+                    } else {
+                        state.showAccounts = false;
+                    }
+                }
+            } else {
+                upWasDown = false;
+                downWasDown = false;
+                selectWasDown = false;
+            }
+            xWasDown = x;
+            bWasDown = back;
+            RenderAuth(renderer, state);
+            std::this_thread::sleep_for(std::chrono::milliseconds(70));
+        }
+    };
+
     auto expiresAt = std::chrono::steady_clock::now() + std::chrono::seconds(device.expiresIn);
     int interval = device.interval;
     while (std::chrono::steady_clock::now() < expiresAt) {
@@ -803,7 +1012,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
             std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::steady_clock::now()).count());
         state.status = L"Waiting for Microsoft sign-in";
         state.detail = L"Use the account that owns Minecraft Java Edition.";
-        SleepWithAuthUi(renderer, state, interval * 1000);
+        waitWithAccountOptions(interval * 1000);
 
         state.status = L"Checking sign-in";
         state.detail.clear();
@@ -851,6 +1060,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
         return false;
     }
 
+    state.showAccounts = false;
     state.status = L"Microsoft sign-in expired";
     state.detail = L"Restart the app to request a new code.";
     state.isError = true;

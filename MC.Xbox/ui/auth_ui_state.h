@@ -26,6 +26,10 @@ struct AuthUiState {
     bool showAccounts = false;
     int selectedAccountIndex = 0;
     std::wstring accountsMessage = L"A  Select an option";
+    std::vector<std::wstring> localNames;
+    int localActive = -1;
+    int localCursor = -1;
+    bool localDeletePending = false;
     bool showRemoteFiles = false;
     bool showModsPage = false;
     int selectedMenuIndex = 0;

@@ -217,6 +217,25 @@ std::vector<Scene> Scenes() {
         state.accountsMessage = L"A  Select an option  |  B  Back";
         return state;
     } });
+    scenes.push_back({ L"accounts-prelogin", [] {
+        AuthUiState state = Screen();
+        state.showDeviceCode = true;
+        state.showAccounts = true;
+        state.homePlayerName.clear();
+        state.accountsMessage = L"A  Select option  |  B  Back to sign-in";
+        return state;
+    } });
+    scenes.push_back({ L"accounts-local-saved", [] {
+        AuthUiState state = Screen();
+        state.showDeviceCode = true;
+        state.showAccounts = true;
+        state.selectedAccountIndex = 1;
+        state.localNames = { L"Local 1", L"Local 2" };
+        state.localActive = 0;
+        state.localCursor = 1;
+        state.accountsMessage = L"A Select  |  X New  |  Y Delete";
+        return state;
+    } });
     scenes.push_back({ L"accounts-local", [] {
         AuthUiState state = Screen();
         state.showAccounts = true;
