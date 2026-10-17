@@ -2199,7 +2199,7 @@ void ShowModsPage(
         loadedQuery.clear();
         state.modsFocus = 1;
         state.modsSearchEditing = false;
-        state.status = L"Search cleared - showing " + std::wstring(ModsTabAt(state.selectedModsTab).label);
+        state.status = L"Search cleared. Results reloaded for the selected tab.";
     };
 
     auto refreshBrowseResults = [&]() {
