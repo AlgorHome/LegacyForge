@@ -424,6 +424,18 @@ static void MarkInstalledBrowseCards(std::vector<ModCard>& cards,
     }
 }
 
+static void RefreshDetailInstalledState(AuthUiState& state, const std::wstring& root) {
+    if (!state.modsDetailOpen || state.modsDetailCard.kind != ContentKind::Mod) return;
+    // Recompute from the active profile rather than trusting the prior browse
+    // card or a successful progress message. Avoid retaining stale flags.
+    std::vector<ModCard> one{state.modsDetailCard};
+    one[0].installed = false;
+    one[0].installedDisabled = false;
+    MarkInstalledBrowseCards(one, root, GetActiveProfileId(root));
+    state.modsDetailCard.installed = one[0].installed;
+    state.modsDetailCard.installedDisabled = one[0].installedDisabled;
+}
+
 static bool ToggleProfileMod(const std::wstring& runtimeRoot,
                              const std::wstring& profileId,
                              const std::wstring& name,
@@ -2598,6 +2610,19 @@ void ShowModsPage(
             const std::wstring s = GetInstallStatus();
             state.status = !s.empty() ? s : (ok ? L"Installed" : L"Install failed");
             state.isError = !ok;
+            if (ok) {
+                RefreshDetailInstalledState(state, runtimeRoot);
+                if (state.selectedModsTab != modstab::kProfiles) {
+                    // Update already-visible browse cards after successful install.
+                    // This also respects the active profile and recorded metadata.
+                    for (ModCard& card : state.modsCards) {
+                        if (card.kind != ContentKind::Mod) continue;
+                        card.installed = false;
+                        card.installedDisabled = false;
+                    }
+                    MarkInstalledBrowseCards(state.modsCards, runtimeRoot, GetActiveProfileId(runtimeRoot));
+                }
+            }
             if (ok && state.selectedModsTab == modstab::kProfiles) {
                 LoadModsTab(state, runtimeRoot);
                 loadedQuery = state.modsSearchQuery;
@@ -2971,7 +2996,13 @@ void ShowModsPage(
                 state.modsDetailOpen = false;
                 state.status.clear();
             } else if ((selectDown && !selectWasDown) || (enterDown && !enterWasDown) || clickActivate) {
-                if (state.modsCompatWarn && !state.modsCompatAcked) {
+                if (state.modsDetailCard.kind == ContentKind::Mod &&
+                    (state.modsDetailCard.installed || state.modsDetailCard.installedDisabled)) {
+                    state.status = state.modsDetailCard.installedDisabled
+                        ? L"Already installed but disabled. Re-enable from Profiles."
+                        : L"Already installed in this profile.";
+                    state.isError = false;
+                } else if (state.modsCompatWarn && !state.modsCompatAcked) {
                     state.modsCompatAcked = true;
                     state.status = L"Press install again to add it anyway";
                     state.isError = false;
@@ -3260,6 +3291,7 @@ void ShowModsPage(
                 } else {
                     state.modsDetailCard = selected;
                     state.modsDetailOpen = true;
+                    RefreshDetailInstalledState(state, runtimeRoot);
                     state.modsDetailScroll = 0;
                     state.modsDetailBody.clear();
                     state.modsDetailBold.clear();

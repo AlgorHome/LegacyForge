@@ -295,14 +295,24 @@ public:
                 const float btnW = 240.0f;
                 const float btnH = 54.0f;
                 const bool installing = g_installRunning.load();
+                const bool modInstalled = card.kind == ContentKind::Mod && card.installed;
+                const bool modDisabled = card.kind == ContentKind::Mod && card.installedDisabled;
+                const bool alreadyInstalled = modInstalled || modDisabled;
                 const D2D1_RECT_F installBtn = D2D1::RectF(right - btnW, iconRect.bottom + 16.0f, right, iconRect.bottom + 16.0f + btnH);
                 RegisterHit(launchhit::kDetailInstall, installBtn);
                 if (!installing) GlowSelect(installBtn, 12.0f);
-                FillRound(installBtn, installing ? panel.Get() : accent.Get(), 12.0f);
-                StrokeRound(installBtn, accent.Get(), 12.0f, 2.0f);
-                DrawIcon(installing ? L"\uE895" : L"\uE896", D2D1::RectF(installBtn.left + 18.0f, installBtn.top, installBtn.left + 46.0f, installBtn.bottom), installing ? muted.Get() : black.Get());
-                DrawText(installing ? L"Installing..." : (card.kind == ContentKind::Modpack ? L"Install pack" : L"Install"),
-                    bodyMid_.Get(), D2D1::RectF(installBtn.left + 52.0f, installBtn.top, installBtn.right - 8.0f, installBtn.bottom), installing ? muted.Get() : black.Get());
+                FillRound(installBtn, installing ? panel.Get() :
+                    (alreadyInstalled ? installedHighlight.Get() : accent.Get()), 12.0f);
+                StrokeRound(installBtn, alreadyInstalled ? installedHighlight.Get() : accent.Get(), 12.0f, 2.0f);
+                DrawIcon(installing ? L"\uE895" : (alreadyInstalled ? L"\uE73E" : L"\uE896"),
+                    D2D1::RectF(installBtn.left + 18.0f, installBtn.top, installBtn.left + 46.0f, installBtn.bottom),
+                    installing ? muted.Get() : black.Get());
+                const wchar_t* installLabel = installing ? L"Installing..." :
+                    modDisabled ? L"Installed - Off" : modInstalled ? L"Installed" :
+                    (card.kind == ContentKind::Modpack ? L"Install pack" : L"Install");
+                DrawText(installLabel, bodyMid_.Get(),
+                    D2D1::RectF(installBtn.left + 52.0f, installBtn.top, installBtn.right - 8.0f, installBtn.bottom),
+                    installing ? muted.Get() : black.Get());
 
                 RegisterHit(launchhit::kBack, D2D1::RectF(left, iconRect.bottom + 22.0f, left + 220.0f, iconRect.bottom + 62.0f));
                 DrawIcon(L"\uE72B", D2D1::RectF(left, iconRect.bottom + 26.0f, left + 26.0f, iconRect.bottom + 26.0f + 30.0f), muted.Get());
