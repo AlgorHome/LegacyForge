@@ -966,6 +966,28 @@ public:
                 D2D1::RectF(saved.left + 18.0f, saved.top + 208.0f,
                     saved.right - 18.0f, saved.top + 285.0f), muted.Get());
 
+            DrawText(L"LOCAL LAUNCHER IDENTITIES", cardTitleFormat_.Get(),
+                D2D1::RectF(saved.left + 18.0f, saved.top + 319.0f,
+                    saved.right - 16.0f, saved.top + 354.0f), white.Get());
+            std::wstring shownLocal = L"None saved  /  A to create";
+            if (state.localCursor >= 0 && state.localCursor < static_cast<int>(state.localNames.size())) {
+                shownLocal = state.localNames[state.localCursor];
+                if (state.localCursor == state.localActive) shownLocal += L"  (active)";
+            }
+            DrawText(shownLocal.c_str(), bodyMid_.Get(),
+                D2D1::RectF(saved.left + 18.0f, saved.top + 359.0f,
+                    saved.right - 16.0f, saved.top + 405.0f), accent.Get());
+            const std::wstring localTotal = std::to_wstring(state.localNames.size()) +
+                L" saved  |  Left/Right to browse";
+            DrawText(localTotal.c_str(), captionFormat_.Get(),
+                D2D1::RectF(saved.left + 18.0f, saved.top + 412.0f,
+                    saved.right - 16.0f, saved.top + 444.0f), muted.Get());
+            DrawText(L"Local identities are launcher-only.\n"
+                L"Minecraft ownership is still required to play.",
+                captionFormat_.Get(),
+                D2D1::RectF(saved.left + 18.0f, saved.top + 457.0f,
+                    saved.right - 16.0f, saved.top + 520.0f), muted.Get());
+
             DrawText(L"ADD ACCOUNT / OPTIONS", cardTitleFormat_.Get(),
                 D2D1::RectF(methods.left + 20.0f, methods.top + 18.0f,
                     methods.right - 16.0f, methods.top + 54.0f), white.Get());
@@ -974,7 +996,7 @@ public:
                 L"Custom Skin Service (Ely.by)", L"Get Minecraft", L"Account Help"
             };
             const wchar_t* hints[] = {
-                L"Default  /  device-code sign-in", L"Local identity  /  coming later",
+                L"Default  /  device-code sign-in", L"Local identity  /  A select, X new",
                 L"Optional service  /  coming later", L"Official information",
                 L"Sign-in and ownership guidance"
             };

@@ -12,6 +12,7 @@
 #include "remote_file_server.h"
 #include "telemetry.h"
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -546,6 +547,92 @@ static void ShowSettingsPage(ICoreWindow* window, AuthScreenRenderer* renderer, 
         : L"Crash reporting is off";
     state.detail = L"";
     WriteLog(L"Settings page closed");
+}
+
+
+// Offline launcher identities are UI metadata only, never Minecraft credentials.
+static std::wstring LocalIdsFile() {
+    return GetLocalStateDir() + L"\\accounts\\local_ids.txt";
+}
+static void LoadLocalIds(AuthUiState& s) {
+    s.localNames.clear();
+    s.localActive = -1;
+    s.localCursor = -1;
+    std::wstring raw;
+    if (!ReadTextFile(LocalIdsFile(), raw) || raw.size() > 2048) return;
+    size_t pos = raw.find(L'\n');
+    if (pos == std::wstring::npos) return;
+    const std::wstring active = TrimWhitespace(raw.substr(0, pos));
+    ++pos;
+    while (pos < raw.size() && s.localNames.size() < 12) {
+        size_t end = raw.find(L'\n', pos);
+        std::wstring name = TrimWhitespace(raw.substr(pos, end == std::wstring::npos ? std::wstring::npos : end - pos));
+        if (!name.empty() && name.size() <= 24 &&
+            name.find_first_of(L"\\/:*?\"<>|\r\t") == std::wstring::npos &&
+            std::find(s.localNames.begin(), s.localNames.end(), name) == s.localNames.end())
+            s.localNames.push_back(name);
+        if (end == std::wstring::npos) break;
+        pos = end + 1;
+    }
+    for (int i = 0; i < static_cast<int>(s.localNames.size()); ++i)
+        if (s.localNames[i] == active) s.localActive = i;
+    s.localCursor = s.localActive >= 0 ? s.localActive : (s.localNames.empty() ? -1 : 0);
+}
+static bool SaveLocalIds(const AuthUiState& s) {
+    if (!EnsureDirectoryTree(GetLocalStateDir() + L"\\accounts")) return false;
+    std::wstring body = (s.localActive >= 0 && s.localActive < static_cast<int>(s.localNames.size()))
+        ? s.localNames[s.localActive] : L"";
+    body += L"\n";
+    for (const auto& n : s.localNames) body += n + L"\n";
+    return WriteTextFile(LocalIdsFile(), body);
+}
+static void LocalIdAction(AuthUiState& s, int kind) {
+    // 0 select/create, 1 new, 2 previous, 3 next, 4 ask delete.
+    const int count = static_cast<int>(s.localNames.size());
+    if (kind == 1 || (kind == 0 && count == 0)) {
+        if (count >= 12) { s.accountsMessage = L"Maximum 12 local identities."; return; }
+        int n = 1;
+        std::wstring name;
+        do { name = L"Local " + std::to_wstring(n++); }
+        while (std::find(s.localNames.begin(), s.localNames.end(), name) != s.localNames.end());
+        s.localNames.push_back(name);
+        s.localCursor = static_cast<int>(s.localNames.size()) - 1;
+        s.localActive = s.localCursor;
+        s.localDeletePending = false;
+        s.accountsMessage = SaveLocalIds(s) ? L"Local identity saved (launcher only)." : L"Could not save identity.";
+        return;
+    }
+    if (count == 0) { s.accountsMessage = L"Press A to create a local identity."; return; }
+    if (s.localCursor < 0 || s.localCursor >= count) s.localCursor = 0;
+    if (kind == 2 || kind == 3) {
+        s.localCursor = (s.localCursor + count + (kind == 2 ? -1 : 1)) % count;
+        s.localDeletePending = false;
+        s.accountsMessage = L"A Select  |  X New  |  Y Delete";
+        return;
+    }
+    if (kind == 4) {
+        s.localDeletePending = true;
+        s.accountsMessage = L"Delete selected local identity? A Confirm / B Cancel";
+        return;
+    }
+    if (s.localDeletePending) {
+        const int old = s.localCursor;
+        s.localNames.erase(s.localNames.begin() + old);
+        s.localActive = s.localActive == old ? -1 : (s.localActive > old ? s.localActive - 1 : s.localActive);
+        s.localCursor = s.localNames.empty() ? -1 : (std::min)(old, static_cast<int>(s.localNames.size()) - 1);
+        s.localDeletePending = false;
+        s.accountsMessage = SaveLocalIds(s) ? L"Local identity deleted." : L"Could not save deletion.";
+        return;
+    }
+    s.localActive = s.localCursor;
+    s.accountsMessage = SaveLocalIds(s) ? L"Local identity selected. Minecraft is not unlocked." : L"Could not save selection.";
+}
+static void OpenAccounts(AuthUiState& s) {
+    s.showAccounts = true;
+    s.selectedAccountIndex = 0;
+    s.localDeletePending = false;
+    LoadLocalIds(s);
+    s.accountsMessage = L"A Select  |  Local: X New / Y Delete  |  B Back";
 }
 
 MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authConfig, const std::wstring& runtimeRoot) {
