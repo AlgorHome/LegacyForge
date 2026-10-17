@@ -32,8 +32,8 @@ std::vector<ModCard> CardsFor(int tab) {
     case modstab::kProfiles:
         return {
             Card(ContentKind::Mod, L"+ New profile", L"Create 1.21.11 Fabric profile", L""),
-            Card(ContentKind::Mod, L"Survival", L"1.21.11 Fabric - 12 mods", L"\u25CF Playing this"),
-            Card(ContentKind::Mod, L"Vanilla", L"1.21.11 Fabric - Pure vanilla, no mods", L""),
+            Card(ContentKind::Mod, L"Survival", L"1.21.11 Fabric - 12 mods", L"\u25CF Active profile"),
+            Card(ContentKind::Mod, L"Vanilla", L"1.21.11 Vanilla - Pure vanilla, no mods", L"Y Set active"),
         };
     case modstab::kModpacks:
         return {

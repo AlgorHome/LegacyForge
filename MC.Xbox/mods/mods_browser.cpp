@@ -1778,10 +1778,10 @@ static void LoadModsTab(AuthUiState& state, const std::wstring& runtimeRoot) {
                 const int n = ProfileModCount(runtimeRoot, p.id);
                 c.description = targetText + L" - " + std::to_wstring(n) + (n == 1 ? L" mod" : L" mods");
             }
-            c.status = isActive ? L"\u25CF Playing this" : L"";
+            c.status = isActive ? L"\u25CF Active profile" : L"Y Set active";
             state.modsCards.push_back(c);
         }
-        state.status = L"A open or restore  -  X delete profile  -  installs go to the active profile";
+        state.status = L"A inspect  -  Y set active  -  X delete  -  installed mods belong to each profile";
         return;
     }
 
@@ -2824,6 +2824,33 @@ void ShowModsPage(
                 ensureSelectionVisible();
             }
             lastEnsuredSel = state.selectedModIndex;
+
+            // Phase 5B: activate a saved profile directly from its card.
+            // Y is reserved for renaming inside the profile detail panel,
+            // so this shortcut applies only to the profile card grid.
+            if (state.selectedModsTab == modstab::kProfiles && state.modsFocus == 2 &&
+                yDown && !yWasDown && state.selectedModIndex >= 0 &&
+                state.selectedModIndex < count) {
+                const ModCard& chosen = state.modsCards[static_cast<size_t>(state.selectedModIndex)];
+                if (chosen.projectId == L"__profile__") {
+                    const std::wstring chosenId = chosen.filePath;
+                    SetActiveProfileId(runtimeRoot, chosenId);
+                    SetModsTargetFromProfile(state, runtimeRoot, chosenId);
+                    LoadModsTab(state, runtimeRoot);
+                    loadedQuery = state.modsSearchQuery;
+                    for (int i = 0; i < static_cast<int>(state.modsCards.size()); ++i) {
+                        if (state.modsCards[static_cast<size_t>(i)].projectId == L"__profile__" &&
+                            state.modsCards[static_cast<size_t>(i)].filePath == chosenId) {
+                            state.selectedModIndex = i;
+                            break;
+                        }
+                    }
+                    ensureSelectionVisible();
+                    state.status = L"Active profile: " + state.activeProfileName +
+                        L" - " + TargetProfileText(CurrentModsTarget(state));
+                    state.isError = false;
+                }
+            }
 
             if (state.selectedModsTab == modstab::kProfiles && xDown && !xWasDown &&
                 state.selectedModIndex >= 0 && state.selectedModIndex < count) {
