@@ -2668,11 +2668,26 @@ void ShowModsPage(
         if (state.modsProfileOpen) {
             const int pmTotal = static_cast<int>(state.modsProfileMods.size());
             const int pmRows = (std::max)(1, g_profileRowsVisible.load());
+            // Keep selection and viewport bounded even after the list shrinks.
+            // This also guards against stale state when reopening a large profile.
             auto pmEnsureVisible = [&]() {
+                if (pmTotal == 0) {
+                    state.modsProfileSel = 0;
+                    state.modsProfileScroll = 0;
+                    if (state.modsProfileFocus == 2) state.modsProfileFocus = 0;
+                    return;
+                }
+                state.modsProfileSel = (std::min)((std::max)(0, state.modsProfileSel), pmTotal - 1);
+                const int totalRows = (pmTotal + 1) / 2;
+                const int maxScroll = (std::max)(0, totalRows - pmRows);
+                state.modsProfileScroll = (std::min)((std::max)(0, state.modsProfileScroll), maxScroll);
                 const int selRow = state.modsProfileSel / 2;
                 if (selRow < state.modsProfileScroll) state.modsProfileScroll = selRow;
-                else if (selRow >= state.modsProfileScroll + pmRows) state.modsProfileScroll = selRow - pmRows + 1;
+                else if (selRow >= state.modsProfileScroll + pmRows)
+                    state.modsProfileScroll = selRow - pmRows + 1;
+                state.modsProfileScroll = (std::min)(state.modsProfileScroll, maxScroll);
             };
+            pmEnsureVisible();
             const bool gridFocus = state.modsProfileFocus == 2;
             if (state.modsInspectOpen) {
                 if (backDown && !backWasDown) {
@@ -2781,9 +2796,6 @@ void ShowModsPage(
                     pendingModRemoval.clear();
                     const int removed = RemoveProfileModAndUnusedDependencies(runtimeRoot, state.modsProfileId, jar);
                     state.modsProfileMods = ListProfileMods(runtimeRoot, state.modsProfileId);
-                    const int newTotal = static_cast<int>(state.modsProfileMods.size());
-                    if (state.modsProfileSel >= newTotal) state.modsProfileSel = (std::max)(0, newTotal - 1);
-                    if (newTotal == 0) state.modsProfileFocus = 0;
                     pmEnsureVisible();
                     state.status = removed > 1
                         ? L"Removed " + jar + L" and " + std::to_wstring(removed - 1) + L" unused dependenc" + (removed == 2 ? L"y" : L"ies")
