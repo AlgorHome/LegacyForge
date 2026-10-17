@@ -102,3 +102,19 @@ The Accounts navigation entry and account-options page are implemented on `featu
 ## Pre-login Accounts navigation
 
 The Microsoft device-code page now offers **X Other Account Options**. Xbox X opens Accounts while the code is pending; D-pad navigates, A displays availability information and B returns to sign-in. Minecraft ownership is not required to browse the panel. Other methods remain informational. Microsoft device-code polling continues. PC build and Xbox testing pending.
+
+## Phase 4A/B: Local launcher identities (implemented on feature branch; untested on console)
+
+Under **Accounts → Local Profile**, A creates the first named identity (`Local 1`) if none exists. Use X to create additional sequentially named identities (maximum 12), Left/Right to browse, A to select, Y then A to confirm deletion or B to cancel. The UI displays the selected and active identities. Names/selection persist in UWP LocalState `accounts\\local_ids.txt` with no Microsoft tokens or passwords. All input actions are available without Minecraft Java ownership through X at the sign-in screen.
+
+This is a deliberately bounded first step: custom name entry via Xbox on-screen keyboard, full rename workflow, and a non-authenticated dashboard preview are **not** yet implemented. Local launcher identities do not confer Java Edition ownership or enable Play; authenticated Minecraft still requires Microsoft verification.
+
+### Local identity Xbox acceptance
+
+- [ ] Microsoft device-code screen still opens Accounts using X.
+- [ ] Local Profile A creates `Local 1`; another X creates `Local 2`.
+- [ ] Left/Right browses, A changes the active local identity.
+- [ ] Close and reopen launcher; both identities and selected active name persist.
+- [ ] Y then B cancels deletion; Y then A deletes; restart confirms persistence.
+- [ ] The Microsoft flow, B navigation, and other account information still work.
+- [ ] No unauthenticated Minecraft Play action becomes available.

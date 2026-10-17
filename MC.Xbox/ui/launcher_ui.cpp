@@ -667,6 +667,10 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
     bool downWasDown = false;
     bool selectWasDown = false;
     bool accountBackWasDown = false;
+    bool localXWasDown = false;
+    bool localYWasDown = false;
+    bool localLeftWasDown = false;
+    bool localRightWasDown = false;
 
     ShowCrashScreen(window, renderer, state);
 
@@ -712,13 +716,32 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
             if (goDown && !downWasDown) {
                 state.selectedAccountIndex = (state.selectedAccountIndex + 1) % 5;
             }
+            const bool localX = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_GamepadX
+            });
+            const bool localY = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_GamepadY
+            });
+            const bool localLeft = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Left,
+                ABI::Windows::System::VirtualKey_GamepadDPadLeft
+            });
+            const bool localRight = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_Right,
+                ABI::Windows::System::VirtualKey_GamepadDPadRight
+            });
+            if (state.selectedAccountIndex == 1) {
+                if (localX && !localXWasDown) LocalIdAction(state, 1);
+                if (localY && !localYWasDown) LocalIdAction(state, 4);
+                if (localLeft && !localLeftWasDown) LocalIdAction(state, 2);
+                if (localRight && !localRightWasDown) LocalIdAction(state, 3);
+            }
             if (goSelect && !selectWasDown) {
-                switch (state.selectedAccountIndex) {
+                if (state.selectedAccountIndex == 1) {
+                    LocalIdAction(state, 0);
+                } else switch (state.selectedAccountIndex) {
                 case 0:
                     state.accountsMessage = L"Microsoft account connected. Use Sign out on Home to switch.";
-                    break;
-                case 1:
-                    state.accountsMessage = L"Local launcher profiles are planned, not enabled yet.";
                     break;
                 case 2:
                     state.accountsMessage = L"Ely.by integration is not implemented yet.";
@@ -732,9 +755,18 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                 }
             }
             if (goBack && !accountBackWasDown) {
-                state.showAccounts = false;
-                state.showMainMenu = true;
+                if (state.localDeletePending) {
+                    state.localDeletePending = false;
+                    state.accountsMessage = L"Delete cancelled.";
+                } else {
+                    state.showAccounts = false;
+                    state.showMainMenu = true;
+                }
             }
+            localXWasDown = localX;
+            localYWasDown = localY;
+            localLeftWasDown = localLeft;
+            localRightWasDown = localRight;
             upWasDown = goUp;
             downWasDown = goDown;
             selectWasDown = goSelect;
@@ -786,9 +818,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
             } else if (selected == 2) {
                 WriteLog(L"Main menu: Accounts selected");
                 state.showMainMenu = false;
-                state.showAccounts = true;
-                state.selectedAccountIndex = 0;
-                state.accountsMessage = L"A  Select an option  |  B  Back";
+                OpenAccounts(state);
             } else if (selected == 3) {
                 WriteLog(L"Main menu: Remote files selected");
                 ShowRemoteFilesPage(window, renderer, state, runtimeRoot);
@@ -889,6 +919,9 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
     bool upWasDown = false;
     bool downWasDown = false;
     bool selectWasDown = false;
+    bool localYWasDown = false;
+    bool localLeftWasDown = false;
+    bool localRightWasDown = false;
     auto waitWithAccountOptions = [&](int milliseconds) {
         const auto start = std::chrono::steady_clock::now();
         while (std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -902,9 +935,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
                 ABI::Windows::System::VirtualKey_GamepadB
             });
             if (x && !xWasDown && !state.showAccounts) {
-                state.showAccounts = true;
-                state.selectedAccountIndex = 0;
-                state.accountsMessage = L"A  Select option  |  B  Back to sign-in";
+                OpenAccounts(state);
             }
             if (state.showAccounts) {
                 const bool up = AnyVirtualKeyDown(window, {
@@ -921,10 +952,28 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
                 });
                 if (up && !upWasDown) state.selectedAccountIndex = (state.selectedAccountIndex + 4) % 5;
                 if (down && !downWasDown) state.selectedAccountIndex = (state.selectedAccountIndex + 1) % 5;
+                const bool left = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Left,
+                    ABI::Windows::System::VirtualKey_GamepadDPadLeft
+                });
+                const bool right = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_Right,
+                    ABI::Windows::System::VirtualKey_GamepadDPadRight
+                });
+                const bool y = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_GamepadY
+                });
+                if (state.selectedAccountIndex == 1) {
+                    if (x && !xWasDown) LocalIdAction(state, 1);
+                    if (y && !localYWasDown) LocalIdAction(state, 4);
+                    if (left && !localLeftWasDown) LocalIdAction(state, 2);
+                    if (right && !localRightWasDown) LocalIdAction(state, 3);
+                }
                 if (select && !selectWasDown) {
-                    switch (state.selectedAccountIndex) {
+                    if (state.selectedAccountIndex == 1) {
+                        LocalIdAction(state, 0);
+                    } else switch (state.selectedAccountIndex) {
                     case 0: state.accountsMessage = L"Press B to return to Microsoft sign-in."; break;
-                    case 1: state.accountsMessage = L"Local Profiles are coming later."; break;
                     case 2: state.accountsMessage = L"Ely.by integration is coming later."; break;
                     case 3: state.accountsMessage = L"Minecraft Java information: minecraft.net"; break;
                     default: state.accountsMessage = L"Microsoft verifies Java Edition ownership."; break;
@@ -933,7 +982,17 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
                 upWasDown = up;
                 downWasDown = down;
                 selectWasDown = select;
-                if (back && !bWasDown) state.showAccounts = false;
+                localLeftWasDown = left;
+                localRightWasDown = right;
+                localYWasDown = y;
+                if (back && !bWasDown) {
+                    if (state.localDeletePending) {
+                        state.localDeletePending = false;
+                        state.accountsMessage = L"Delete cancelled.";
+                    } else {
+                        state.showAccounts = false;
+                    }
+                }
             } else {
                 upWasDown = false;
                 downWasDown = false;
