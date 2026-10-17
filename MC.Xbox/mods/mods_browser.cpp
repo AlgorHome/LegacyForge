@@ -2186,6 +2186,36 @@ void ShowModsPage(
         state.status = std::to_wstring(after) + L" of " + std::to_wstring(total);
     };
 
+    auto resetBrowseSearch = [&]() {
+        // Deliberately do not clear the shared OSK buffer while it owns focus.
+        if (state.modsSearchEditing || state.modsRenaming) return;
+        state.modsSearchQuery.clear();
+        {
+            std::lock_guard<std::mutex> lock(g_modsSearchMutex);
+            g_modsSearchBuffer.clear();
+            g_modsSearchDirty = false;
+        }
+        LoadModsTab(state, runtimeRoot);
+        loadedQuery.clear();
+        state.modsFocus = 1;
+        state.modsSearchEditing = false;
+        state.status = L"Search cleared - showing " + std::wstring(ModsTabAt(state.selectedModsTab).label);
+    };
+
+    auto refreshBrowseResults = [&]() {
+        if (state.modsSearchEditing || state.modsRenaming || state.modsDetailOpen ||
+            state.modsProfileOpen || state.modsTargetOpen || g_installRunning.load()) return;
+        LoadModsTab(state, runtimeRoot);
+        loadedQuery = state.modsSearchQuery;
+        state.modsFocus = state.modsCards.empty() ? 1 : 2;
+        state.selectedModIndex = 0;
+        state.modsScrollRow = 0;
+        if (!state.isError) {
+            state.status = L"Results refreshed - " + std::to_wstring(state.modsCards.size()) +
+                L" loaded (Y refresh / X clear search)";
+        }
+    };
+
     auto selectTab = [&](int tab) {
         if (tab == state.selectedModsTab) return;
         state.selectedModsTab = tab;
@@ -2652,6 +2682,18 @@ void ShowModsPage(
                     loadMore();
                 }
             }
+        }
+
+        // Browse recovery actions: X on the search field clears its query,
+        // Y from result cards retries a fetch. Never run while the OSK or
+        // an installation/detail/profile modal has control.
+        if (state.modsFocus == 1 && !state.modsSearchEditing &&
+            xDown && !xWasDown && !state.modsTargetOpen &&
+            state.selectedModsTab != modstab::kProfiles) {
+            resetBrowseSearch();
+        } else if (state.modsFocus == 2 && yDown && !yWasDown &&
+                   state.selectedModsTab != modstab::kProfiles) {
+            refreshBrowseResults();
         }
 
         if (state.modsFocus == 4) {
