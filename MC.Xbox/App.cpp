@@ -514,22 +514,38 @@ public:
 
         LaunchAuthConfig authConfig;
         bool authConfigReady = false;
+        bool localSession = false;
+        std::wstring localName;
         for (;;) {
         bool repairDownloads = false;
         while (true) {
-            if (!authConfigReady && !ResolveLaunchAuthConfig(g_authWindow.Get(), authConfig)) {
-                WriteLog(L"Dynamic authentication failed");
-                return E_FAIL;
+            if (!authConfigReady && !localSession) {
+                localName.clear();
+                if (ResolveLaunchAuthConfig(g_authWindow.Get(), authConfig, localName)) {
+                    authConfigReady = true;
+                } else if (!localName.empty()) {
+                    localSession = true;
+                    WriteLog(L"Local launcher only - no Minecraft auth");
+                } else {
+                    WriteLog(L"Dynamic authentication failed");
+                    return E_FAIL;
+                }
             }
-            authConfigReady = true;
-
-            const MainMenuAction menuAction = ShowMainMenu(g_authWindow.Get(), authConfig, exeDir);
+            const MainMenuAction menuAction = ShowMainMenu(g_authWindow.Get(), authConfig, exeDir,
+                localSession, localName);
             if (menuAction == MainMenuAction::Play) {
                 break;
             }
-            if (menuAction == MainMenuAction::RepairDownloads) {
+            if (menuAction == MainMenuAction::RepairDownloads && !localSession) {
                 repairDownloads = true;
                 break;
+            }
+            if (localSession || menuAction == MainMenuAction::ReturnToSignIn) {
+                localSession = false;
+                localName.clear();
+                authConfig = LaunchAuthConfig{};
+                authConfigReady = false;
+                continue;
             }
 
             ClearRefreshToken();

@@ -1019,7 +1019,10 @@ public:
                     D2D1::RectF(rect.left + 15.0f, rect.top + 34.0f,
                         rect.right - 14.0f, rect.bottom - 3.0f), muted.Get());
             }
-            DrawText(state.accountsMessage.c_str(), captionFormat_.Get(),
+            const std::wstring optionsHint = state.accountsMessage +
+                ((state.showDeviceCode && state.localActive >= 0) ?
+                  L"  |  Menu: Local Dashboard" : L"");
+            DrawText(optionsHint.c_str(), captionFormat_.Get(),
                 D2D1::RectF(methods.left + 20.0f, methods.bottom - 43.0f,
                     methods.right - 16.0f, methods.bottom - 9.0f), accent.Get());
             if (state.localNameEditing) {
@@ -1080,7 +1083,7 @@ public:
                 right, headerTop + 91.0f);
             FillRound(account, surfaceFill.Get(), 13.0f);
             StrokeRound(account, softEdge.Get(), 13.0f, 1.0f);
-            DrawText(L"MICROSOFT ACCOUNT", captionFormat_.Get(),
+            DrawText(state.isLocalSession ? L"LOCAL LAUNCHER MODE" : L"MICROSOFT ACCOUNT", captionFormat_.Get(),
                 D2D1::RectF(account.left + 16.0f, account.top + 12.0f,
                     account.right - 12.0f, account.top + 37.0f), muted.Get());
             const std::wstring player = state.homePlayerName.empty()
@@ -1180,7 +1183,7 @@ public:
             DrawIcon(L"\uE768",
                 D2D1::RectF(play.left + 16.0f, play.top, play.left + 54.0f, play.bottom),
                 playSelected ? black.Get() : accent.Get());
-            DrawText(L"PLAY MINECRAFT", bodyMid_.Get(),
+            DrawText(state.isLocalSession ? L"PLAY LOCKED - SIGN IN REQUIRED" : L"PLAY MINECRAFT", bodyMid_.Get(),
                 D2D1::RectF(play.left + 59.0f, play.top,
                     play.right - 12.0f, play.bottom),
                 playSelected ? black.Get() : white.Get());

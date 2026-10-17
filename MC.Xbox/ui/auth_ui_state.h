@@ -23,6 +23,7 @@ struct AuthUiState {
     bool isError = false;
     bool showDeviceCode = true;
     bool showMainMenu = false;
+    bool isLocalSession = false;
     bool showAccounts = false;
     int selectedAccountIndex = 0;
     std::wstring accountsMessage = L"A  Select an option";
