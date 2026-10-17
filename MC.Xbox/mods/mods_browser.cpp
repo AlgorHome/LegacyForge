@@ -357,6 +357,27 @@ static std::vector<std::wstring> EnabledDependentsForProfileMod(
     return dependents;
 }
 
+static std::wstring InspectProfileMod(const std::wstring& root,
+                                       const std::wstring& profileId,
+                                       const std::wstring& filename) {
+    const std::wstring dir = ProfileModsDir(root, profileId);
+    ProfileModInstallMeta meta;
+    const bool hasMeta = ReadProfileModInstallMetaFromModsDir(dir, ProfileModMetadataName(filename), meta);
+    std::wstring body = L"INSTALLED MOD INSPECTION\n\nFile: " + filename +
+        L"\nState: " + (IsDisabledProfileMod(filename) ? std::wstring(L"Disabled") : std::wstring(L"Enabled")) +
+        L"\nProject: " + (hasMeta && !meta.projectId.empty() ? meta.projectId : L"Unknown (no project metadata)") +
+        L"\nRecorded title: " + (hasMeta && !meta.title.empty() ? meta.title : L"Unknown") +
+        L"\nRecorded as dependency: " + (hasMeta ? (meta.dependency ? L"Yes" : L"No") : L"Unknown");
+    const auto dependents = EnabledDependentsForProfileMod(root, profileId, filename);
+    body += L"\n\nEnabled recorded dependents: " + std::to_wstring(dependents.size());
+    for (size_t i = 0; i < dependents.size() && i < 8; ++i)
+        body += L"\n- " + dependents[i];
+    if (dependents.size() > 8)
+        body += L"\n... and " + std::to_wstring(dependents.size() - 8) + L" more";
+    body += L"\n\nRecorded metadata is incomplete for manually imported mods.\nXbox runtime compatibility is not verified.\n\nB  Close inspection";
+    return body;
+}
+
 static bool ToggleProfileMod(const std::wstring& runtimeRoot,
                              const std::wstring& profileId,
                              const std::wstring& name,
@@ -2254,6 +2275,7 @@ void ShowModsPage(
     bool pageDownWasDown = false;
     bool xWasDown = false;
     bool yWasDown = false;
+    bool inspectWasDown = false;
     bool wasOskVisible = false;
     std::wstring pendingModRemoval;
     std::wstring pendingModDisable;
@@ -2438,6 +2460,10 @@ void ShowModsPage(
             ABI::Windows::System::VirtualKey_GamepadY,
             ABI::Windows::System::VirtualKey_F2
         });
+        const bool inspectDown = AnyVirtualKeyDown(window, {
+            ABI::Windows::System::VirtualKey_GamepadRightThumbstickButton,
+            ABI::Windows::System::VirtualKey_F1
+        });
 
         if (backDown && !backWasDown && !state.modsDetailOpen && !state.modsProfileOpen && !state.modsTargetOpen && !g_installRunning.load()) {
             WriteLog(L"Mods page closed");
@@ -2621,6 +2647,29 @@ void ShowModsPage(
                 else if (selRow >= state.modsProfileScroll + pmRows) state.modsProfileScroll = selRow - pmRows + 1;
             };
             const bool gridFocus = state.modsProfileFocus == 2;
+            if (state.modsInspectOpen) {
+                if (backDown && !backWasDown) {
+                    state.modsInspectOpen = false;
+                    state.modsInspectText.clear();
+                }
+                inspectWasDown = inspectDown;
+                upWasDown = upDown; downWasDown = downDown; leftWasDown = leftDown;
+                rightWasDown = rightDown; selectWasDown = selectDown; enterWasDown = enterDown;
+                backWasDown = backDown; pageUpWasDown = pageUpDown; pageDownWasDown = pageDownDown;
+                xWasDown = xDown; yWasDown = yDown;
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                continue;
+            }
+            if (gridFocus && inspectDown && !inspectWasDown && pmTotal > 0 &&
+                state.modsProfileSel >= 0 && state.modsProfileSel < pmTotal) {
+                pendingModRemoval.clear();
+                pendingModDisable.clear();
+                state.modsInspectText = InspectProfileMod(runtimeRoot, state.modsProfileId,
+                    state.modsProfileMods[static_cast<size_t>(state.modsProfileSel)]);
+                state.modsInspectOpen = true;
+                inspectWasDown = inspectDown;
+                continue;
+            }
             // A pending deletion is tied to one exact JAR and one selection.
             if (!pendingModRemoval.empty() &&
                 (!gridFocus || state.modsProfileSel < 0 || state.modsProfileSel >= pmTotal ||
@@ -3139,6 +3188,7 @@ void ShowModsPage(
             }
         }
 
+        inspectWasDown = inspectDown;
         upWasDown = upDown;
         downWasDown = downDown;
         leftWasDown = leftDown;

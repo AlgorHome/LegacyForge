@@ -440,7 +440,7 @@ public:
                 if (state.modsRenaming) {
                     profileHint = L"Type a name, then close the keyboard to save";
                 } else if (!state.modsProfileBuiltin) {
-                    if (gridFocus) profileHint = L"A  Enable/disable      X  Remove mod      Y  Rename      B  Back";
+                    if (gridFocus) profileHint = L"A Toggle   X Remove   Y Rename   R3 Inspect   B Back";
                     else if (state.modsProfileFocus == 4) profileHint = L"B  Back      A  Export .mrpack for PC";
                     else if (state.modsProfileFocus == 5) profileHint = L"B  Back      A  Toggle built-in controller mod      Y Rename";
                     else profileHint = L"B  Back      A select      X Delete      Y Rename";
@@ -464,7 +464,12 @@ public:
                 const D2D1_RECT_F bodyInner = D2D1::RectF(bodyRect.left + padb, bodyRect.top + padb, bodyRect.right - padb, bodyRect.bottom - padb);
                 const int total = static_cast<int>(state.modsProfileMods.size());
 
-                if (total == 0) {
+                if (state.modsInspectOpen) {
+                    FillRound(bodyRect, panel.Get(), 16.0f);
+                    DrawText(state.modsInspectText.c_str(), smallFormat_.Get(),
+                        D2D1::RectF(bodyInner.left + 12.0f, bodyInner.top + 12.0f,
+                            bodyInner.right - 12.0f, bodyInner.bottom - 12.0f), white.Get());
+                } else if (total == 0) {
                     g_profileMaxScroll.store(0);
                     g_profileRowsVisible.store(1);
                     DrawText(state.modsProfileBuiltin ? L"No mods. This is the clean vanilla game."
