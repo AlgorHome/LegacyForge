@@ -225,6 +225,28 @@ std::vector<Scene> Scenes() {
         state.accountsMessage = L"A  Select option  |  B  Back to sign-in";
         return state;
     } });
+    scenes.push_back({ L"accounts-name-editor", [] {
+        AuthUiState state = Screen();
+        state.showDeviceCode = true;
+        state.showAccounts = true;
+        state.selectedAccountIndex = 1;
+        state.localNameEditing = true;
+        state.localNameDraft = L"My Custom Profile";
+        return state;
+    } });
+    scenes.push_back({ L"accounts-name-rename", [] {
+        AuthUiState state = Screen();
+        state.showDeviceCode = true;
+        state.showAccounts = true;
+        state.selectedAccountIndex = 1;
+        state.localNames = { L"Local 1" };
+        state.localActive = 0;
+        state.localCursor = 0;
+        state.localNameEditing = true;
+        state.localNameRenaming = true;
+        state.localNameDraft = L"Local 1";
+        return state;
+    } });
     scenes.push_back({ L"accounts-local-saved", [] {
         AuthUiState state = Screen();
         state.showDeviceCode = true;

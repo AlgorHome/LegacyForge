@@ -15,6 +15,10 @@
 #include <algorithm>
 #include <chrono>
 #include <thread>
+#include <string_view>
+#include <winrt/Windows.UI.Core.h>
+#include <winrt/Windows.UI.Text.Core.h>
+#include <winrt/Windows.UI.ViewManagement.h>
 
 #include <wrl.h>
 
@@ -635,6 +639,238 @@ static void OpenAccounts(AuthUiState& s) {
     s.accountsMessage = L"A Select  |  Local: X New / Y Delete  |  B Back";
 }
 
+
+// Dedicated Xbox CoreText session; no sharing with the Mods search edit context.
+class LocalIdentityKeyboard {
+public:
+    ~LocalIdentityKeyboard() { End(); }
+
+    bool Begin(ICoreWindow* rawWindow, const std::wstring& initial) {
+        try {
+            winrt::copy_from_abi(window_, rawWindow);
+            value_ = initial;
+            caret_ = static_cast<int>(value_.size());
+            using namespace winrt::Windows::UI::Text::Core;
+            auto manager = CoreTextServicesManager::GetForCurrentView();
+            edit_ = manager.CreateEditContext();
+            edit_.InputPaneDisplayPolicy(CoreTextInputPaneDisplayPolicy::Manual);
+            edit_.InputScope(CoreTextInputScope::Search);
+            textToken_ = edit_.TextRequested([this](auto&&, CoreTextTextRequestedEventArgs const& args) {
+                auto range = args.Request().Range();
+                const int n = static_cast<int>(value_.size());
+                const int a = (std::max)(0, (std::min)(range.StartCaretPosition, n));
+                const int b = (std::max)(a, (std::min)(range.EndCaretPosition, n));
+                args.Request().Text(winrt::hstring(std::wstring_view(value_).substr(a, b - a)));
+            });
+            selectToken_ = edit_.SelectionRequested([this](auto&&, CoreTextSelectionRequestedEventArgs const& args) {
+                args.Request().Selection(CoreTextRange{ caret_, caret_ });
+            });
+            updateToken_ = edit_.TextUpdating([this](auto&&, CoreTextTextUpdatingEventArgs const& args) {
+                const auto range = args.Range();
+                const int n = static_cast<int>(value_.size());
+                const int a = (std::max)(0, (std::min)(range.StartCaretPosition, n));
+                const int b = (std::max)(a, (std::min)(range.EndCaretPosition, n));
+                std::wstring inserted;
+                for (const wchar_t ch : std::wstring_view(args.Text())) {
+                    if (ch == L'\r' || ch == L'\n') { submitted_ = true; continue; }
+                    if ((ch >= L'A' && ch <= L'Z') ||
+                        (ch >= L'a' && ch <= L'z') ||
+                        (ch >= L'0' && ch <= L'9') ||
+                        ch == L' ' || ch == L'_' || ch == L'-')
+                        inserted.push_back(ch);
+                }
+                const size_t remaining = 24 - (value_.size() - static_cast<size_t>(b - a));
+                if (inserted.size() > remaining) inserted.resize(remaining);
+                value_ = value_.substr(0, a) + inserted + value_.substr(b);
+                caret_ = (std::max)(0, (std::min)(args.NewSelection().EndCaretPosition,
+                    static_cast<int>(value_.size())));
+                args.Result(CoreTextTextUpdatingResult::Succeeded);
+            });
+            selectUpdateToken_ = edit_.SelectionUpdating([this](auto&&, CoreTextSelectionUpdatingEventArgs const& args) {
+                caret_ = (std::max)(0, (std::min)(args.Selection().EndCaretPosition,
+                    static_cast<int>(value_.size())));
+                args.Result(CoreTextSelectionUpdatingResult::Succeeded);
+            });
+            layoutToken_ = edit_.LayoutRequested([this](auto&&, CoreTextLayoutRequestedEventArgs const& args) {
+                auto bounds = args.Request().LayoutBounds();
+                const auto rect = window_.Bounds();
+                bounds.TextBounds(rect);
+                bounds.ControlBounds(rect);
+            });
+            keyToken_ = window_.KeyDown([this](auto&&, winrt::Windows::UI::Core::KeyEventArgs const& args) {
+                if (!active_) return;
+                if (args.VirtualKey() == winrt::Windows::System::VirtualKey::Enter) {
+                    submitted_ = true;
+                    args.Handled(true);
+                } else if (args.VirtualKey() == winrt::Windows::System::VirtualKey::Back) {
+                    if (caret_ > 0 && caret_ <= static_cast<int>(value_.size())) {
+                        value_.erase(static_cast<size_t>(caret_ - 1), 1);
+                        --caret_;
+                        try {
+                            using namespace winrt::Windows::UI::Text::Core;
+                            edit_.NotifyTextChanged(CoreTextRange{ caret_, caret_ + 1 }, 0,
+                                CoreTextRange{ caret_, caret_ });
+                            edit_.NotifySelectionChanged(CoreTextRange{ caret_, caret_ });
+                        } catch (...) {}
+                    }
+                    args.Handled(true);
+                }
+            });
+            try { pane_ = winrt::Windows::UI::ViewManagement::InputPane::GetForCurrentView(); } catch (...) {}
+            active_ = true;
+            edit_.NotifyFocusEnter();
+            edit_.NotifyTextChanged(CoreTextRange{ 0, 0 }, caret_, CoreTextRange{ caret_, caret_ });
+            edit_.NotifySelectionChanged(CoreTextRange{ caret_, caret_ });
+            if (pane_) pane_.TryShow();
+            return true;
+        } catch (const winrt::hresult_error& e) {
+            WriteLogF(L"Local identity CoreText failed hr=0x%08X", static_cast<unsigned>(e.code()));
+            End();
+            return false;
+        } catch (...) {
+            End();
+            return false;
+        }
+    }
+    void End() {
+        active_ = false;
+        if (pane_) { try { pane_.TryHide(); } catch (...) {} }
+        if (edit_) { try { edit_.NotifyFocusLeave(); } catch (...) {} }
+        if (window_ && keyToken_.value) { try { window_.KeyDown(keyToken_); } catch (...) {} }
+        if (edit_) {
+            try {
+                if (textToken_.value) edit_.TextRequested(textToken_);
+                if (selectToken_.value) edit_.SelectionRequested(selectToken_);
+                if (updateToken_.value) edit_.TextUpdating(updateToken_);
+                if (selectUpdateToken_.value) edit_.SelectionUpdating(selectUpdateToken_);
+                if (layoutToken_.value) edit_.LayoutRequested(layoutToken_);
+            } catch (...) {}
+        }
+        pane_ = nullptr;
+        edit_ = nullptr;
+        window_ = nullptr;
+    }
+    const std::wstring& Text() const { return value_; }
+    bool Submitted() const { return submitted_; }
+    bool KeyboardVisible() const {
+        if (!pane_) return false;
+        try { return pane_.Visible(); } catch (...) { return false; }
+    }
+private:
+    winrt::Windows::UI::Core::CoreWindow window_{nullptr};
+    winrt::Windows::UI::Text::Core::CoreTextEditContext edit_{nullptr};
+    winrt::Windows::UI::ViewManagement::InputPane pane_{nullptr};
+    winrt::event_token textToken_{};
+    winrt::event_token selectToken_{};
+    winrt::event_token updateToken_{};
+    winrt::event_token selectUpdateToken_{};
+    winrt::event_token layoutToken_{};
+    winrt::event_token keyToken_{};
+    std::wstring value_;
+    int caret_ = 0;
+    bool active_ = false;
+    bool submitted_ = false;
+};
+
+static bool IsValidLocalIdentityName(const std::wstring& name, const AuthUiState& state,
+                                     int renamingIndex, std::wstring& problem) {
+    if (name.empty() || name.size() > 24) {
+        problem = L"Name must be 1-24 characters.";
+        return false;
+    }
+    for (const wchar_t ch : name) {
+        if (!((ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z') ||
+              (ch >= L'0' && ch <= L'9') || ch == L' ' || ch == L'_' || ch == L'-')) {
+            problem = L"Only letters, numbers, spaces, _ and - are supported.";
+            return false;
+        }
+    }
+    for (int i = 0; i < static_cast<int>(state.localNames.size()); ++i) {
+        if (i != renamingIndex && ToLowerW(state.localNames[i]) == ToLowerW(name)) {
+            problem = L"An identity with that name already exists.";
+            return false;
+        }
+    }
+    return true;
+}
+
+static void EditLocalIdentityName(ICoreWindow* window, AuthScreenRenderer* renderer,
+                                  AuthUiState& state, bool rename) {
+    const int index = state.localCursor;
+    if (rename && (index < 0 || index >= static_cast<int>(state.localNames.size()))) {
+        state.accountsMessage = L"Choose a saved local identity before renaming.";
+        return;
+    }
+    if (!rename && state.localNames.size() >= 12) {
+        state.accountsMessage = L"Maximum 12 local identities.";
+        return;
+    }
+    state.localNameEditing = true;
+    state.localNameRenaming = rename;
+    state.localNameDraft = rename ? state.localNames[static_cast<size_t>(index)] : L"";
+    LocalIdentityKeyboard keyboard;
+    if (!keyboard.Begin(window, state.localNameDraft)) {
+        state.localNameEditing = false;
+        state.accountsMessage = L"Xbox keyboard unavailable. No changes saved.";
+        return;
+    }
+
+    bool priorA = true;
+    bool priorB = true;
+    bool canceled = false;
+    while (true) {
+        ProcessAuthUiEvents();
+        state.localNameDraft = keyboard.Text();
+        RenderAuth(renderer, state);
+        const bool a = AnyVirtualKeyDown(window, {
+            ABI::Windows::System::VirtualKey_Enter,
+            ABI::Windows::System::VirtualKey_GamepadA
+        });
+        const bool b = AnyVirtualKeyDown(window, {
+            ABI::Windows::System::VirtualKey_Escape,
+            ABI::Windows::System::VirtualKey_GamepadB
+        });
+        if (b && !priorB && !keyboard.KeyboardVisible()) {
+            canceled = true;
+            break;
+        }
+        if (keyboard.Submitted() || (a && !priorA && !keyboard.KeyboardVisible())) break;
+        priorA = a;
+        priorB = b;
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    keyboard.End();
+    state.localNameEditing = false;
+    if (canceled) {
+        state.accountsMessage = L"Name editing cancelled.";
+        return;
+    }
+    const std::wstring desired = TrimWhitespace(state.localNameDraft);
+    std::wstring issue;
+    if (!IsValidLocalIdentityName(desired, state, rename ? index : -1, issue)) {
+        state.accountsMessage = issue;
+        return;
+    }
+    const auto beforeNames = state.localNames;
+    const int beforeActive = state.localActive;
+    const int beforeCursor = state.localCursor;
+    if (rename) {
+        state.localNames[static_cast<size_t>(index)] = desired;
+    } else {
+        state.localNames.push_back(desired);
+        state.localCursor = static_cast<int>(state.localNames.size()) - 1;
+        state.localActive = state.localCursor;
+    }
+    if (!SaveLocalIds(state)) {
+        state.localNames = beforeNames;
+        state.localActive = beforeActive;
+        state.localCursor = beforeCursor;
+        state.accountsMessage = L"Failed to write local identity file.";
+    } else {
+        state.accountsMessage = rename ? L"Local identity renamed." : L"Local identity created.";
+    }
+}
+
 MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authConfig, const std::wstring& runtimeRoot) {
     AuthScreenRenderer rendererInstance;
     AuthScreenRenderer* renderer = nullptr;
@@ -671,6 +907,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
     bool localYWasDown = false;
     bool localLeftWasDown = false;
     bool localRightWasDown = false;
+    bool localRenameWasDown = false;
 
     ShowCrashScreen(window, renderer, state);
 
@@ -730,15 +967,23 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
                 ABI::Windows::System::VirtualKey_Right,
                 ABI::Windows::System::VirtualKey_GamepadDPadRight
             });
-            if (state.selectedAccountIndex == 1) {
-                if (localX && !localXWasDown) LocalIdAction(state, 1);
+            const bool localRename = AnyVirtualKeyDown(window, {
+                ABI::Windows::System::VirtualKey_GamepadRightShoulder,
+                ABI::Windows::System::VirtualKey_F2
+            });
+            if (state.selectedAccountIndex == 1 && !state.localDeletePending) {
+                if (localX && !localXWasDown) EditLocalIdentityName(window, renderer, state, false);
+                if (localRename && !localRenameWasDown) EditLocalIdentityName(window, renderer, state, true);
                 if (localY && !localYWasDown) LocalIdAction(state, 4);
                 if (localLeft && !localLeftWasDown) LocalIdAction(state, 2);
                 if (localRight && !localRightWasDown) LocalIdAction(state, 3);
             }
             if (goSelect && !selectWasDown) {
                 if (state.selectedAccountIndex == 1) {
-                    LocalIdAction(state, 0);
+                    if (state.localDeletePending || !state.localNames.empty())
+                        LocalIdAction(state, 0);
+                    else
+                        EditLocalIdentityName(window, renderer, state, false);
                 } else switch (state.selectedAccountIndex) {
                 case 0:
                     state.accountsMessage = L"Microsoft account connected. Use Sign out on Home to switch.";
@@ -767,6 +1012,7 @@ MainMenuAction ShowMainMenu(ICoreWindow* window, const LaunchAuthConfig& authCon
             localYWasDown = localY;
             localLeftWasDown = localLeft;
             localRightWasDown = localRight;
+            localRenameWasDown = localRename;
             upWasDown = goUp;
             downWasDown = goDown;
             selectWasDown = goSelect;
@@ -922,6 +1168,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
     bool localYWasDown = false;
     bool localLeftWasDown = false;
     bool localRightWasDown = false;
+    bool localRenameWasDown = false;
     auto waitWithAccountOptions = [&](int milliseconds) {
         const auto start = std::chrono::steady_clock::now();
         while (std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -963,15 +1210,23 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
                 const bool y = AnyVirtualKeyDown(window, {
                     ABI::Windows::System::VirtualKey_GamepadY
                 });
-                if (state.selectedAccountIndex == 1) {
-                    if (x && !xWasDown) LocalIdAction(state, 1);
+                const bool rename = AnyVirtualKeyDown(window, {
+                    ABI::Windows::System::VirtualKey_GamepadRightShoulder,
+                    ABI::Windows::System::VirtualKey_F2
+                });
+                if (state.selectedAccountIndex == 1 && !state.localDeletePending) {
+                    if (x && !xWasDown) EditLocalIdentityName(window, renderer, state, false);
+                    if (rename && !localRenameWasDown) EditLocalIdentityName(window, renderer, state, true);
                     if (y && !localYWasDown) LocalIdAction(state, 4);
                     if (left && !localLeftWasDown) LocalIdAction(state, 2);
                     if (right && !localRightWasDown) LocalIdAction(state, 3);
                 }
                 if (select && !selectWasDown) {
                     if (state.selectedAccountIndex == 1) {
-                        LocalIdAction(state, 0);
+                        if (state.localDeletePending || !state.localNames.empty())
+                            LocalIdAction(state, 0);
+                        else
+                            EditLocalIdentityName(window, renderer, state, false);
                     } else switch (state.selectedAccountIndex) {
                     case 0: state.accountsMessage = L"Press B to return to Microsoft sign-in."; break;
                     case 2: state.accountsMessage = L"Ely.by integration is coming later."; break;
@@ -985,6 +1240,7 @@ bool ResolveLaunchAuthConfig(ICoreWindow* window, LaunchAuthConfig& out) {
                 localLeftWasDown = left;
                 localRightWasDown = right;
                 localYWasDown = y;
+                localRenameWasDown = rename;
                 if (back && !bWasDown) {
                     if (state.localDeletePending) {
                         state.localDeletePending = false;

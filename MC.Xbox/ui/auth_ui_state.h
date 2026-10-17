@@ -30,6 +30,9 @@ struct AuthUiState {
     int localActive = -1;
     int localCursor = -1;
     bool localDeletePending = false;
+    bool localNameEditing = false;
+    bool localNameRenaming = false;
+    std::wstring localNameDraft;
     bool showRemoteFiles = false;
     bool showModsPage = false;
     int selectedMenuIndex = 0;
