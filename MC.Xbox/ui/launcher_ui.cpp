@@ -1,4 +1,5 @@
 #include "launcher_ui.h"
+#include "installed_highlight.h"
 
 #include "mod_source.h"
 
@@ -430,7 +431,7 @@ static void ShowCrashScreen(ICoreWindow* window, AuthScreenRenderer* renderer, A
 }
 
 static void ShowSettingsPage(ICoreWindow* window, AuthScreenRenderer* renderer, AuthUiState& state) {
-    constexpr int kSettingsRows = 3;
+    constexpr int kSettingsRows = 4;
     WriteLog(L"Settings page opened");
 
     state.showMainMenu = false;
@@ -444,6 +445,7 @@ static void ShowSettingsPage(ICoreWindow* window, AuthScreenRenderer* renderer, 
     state.settingsReportingOn = telemetry::ConsentGranted();
     state.settingsInstallId = telemetry::InstallIdText();
     state.settingsModSource = modsource::Current();
+    state.settingsHighlightColor = installedhighlight::CurrentIndex();
     state.settingsCurseForgeKeyHint = modsource::CurseForgeKeyHint();
 
     bool upWas = false;
@@ -534,6 +536,14 @@ static void ShowSettingsPage(ICoreWindow* window, AuthScreenRenderer* renderer, 
                 }
             } else {
                 state.settingsNote = L"The mod source could not be changed.";
+            }
+        } else if (pressed == 3) {
+            const int next = (state.settingsHighlightColor + 1) % installedhighlight::kCount;
+            if (installedhighlight::SetIndex(next)) {
+                state.settingsHighlightColor = next;
+                state.settingsNote = std::wstring(L"Installed mod highlight: ") + installedhighlight::Name(next);
+            } else {
+                state.settingsNote = L"Could not save highlight color.";
             }
         }
 

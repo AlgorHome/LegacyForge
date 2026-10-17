@@ -106,6 +106,7 @@ struct AuthUiState {
 
     bool showSettings = false;
     int settingsSelected = 0;
+    int settingsHighlightColor = 0;
     bool settingsReportingOn = false;
     bool settingsConfigured = false;
     std::wstring settingsInstallId;
